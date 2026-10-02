@@ -5,3 +5,6 @@ node_modules
 next-env.d.ts
 *.tsbuildinfo
 pnpm-lock.yaml
+
+.vercel
+.env*
