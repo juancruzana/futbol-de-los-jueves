@@ -152,27 +152,29 @@ textarea{width:100%;min-height:150px;resize:vertical;line-height:1.45}
 .hl .s{font-size:12px;color:var(--muted);margin-top:2px}
 .fire{color:var(--hot)}
 
-/* Tabla: lista en el celu, tabla completa en pantallas grandes */
-.standings{list-style:none;margin:0 -16px;padding:0;border-top:1px solid var(--line)}
-.standings li{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:2px 10px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line)}
-.standings li.me{background:var(--a-soft)}
-.standings .who{min-width:0;display:grid;gap:4px}
-.standings .name-row{display:flex;align-items:center;gap:8px;min-width:0}
-.standings .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.standings .meta{display:flex;flex-wrap:wrap;gap:0 10px;font-size:12px;color:var(--muted)}
-.standings .meta b{color:var(--ink);font-weight:600}
-.standings .meta .fig,.standings .meta .fig b{color:var(--gold);font-weight:600}
-.standings .pts{text-align:right;line-height:1}
-.standings .pts small{display:block;font-family:var(--body);font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
-.tablewrap{overflow-x:auto}
-table{width:100%;border-collapse:collapse}
-th{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);text-align:left;font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line)}
-td{padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+/* Tabla de posiciones: la misma en celu y escritorio. En el celu se compacta, el jugador queda fijo a la
+   izquierda y el resto scrollea de costado; la sombra del borde derecho avisa que hay más columnas. */
+.tablewrap{overflow-x:auto;overscroll-behavior-x:contain;margin:0 -16px;
+  background:linear-gradient(to left,var(--surface) 40%,transparent) right/32px 100% no-repeat local,
+    linear-gradient(to left,var(--shadow),transparent) right/10px 100% no-repeat scroll}
+/* separate (no collapse): con collapse las celdas sticky pierden los bordes al scrollear */
+table{width:100%;border-collapse:separate;border-spacing:0}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);text-align:left;font-weight:600;padding:6px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:middle;white-space:nowrap}
 td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
 tr:last-child td{border-bottom:0}
-.pos{font-family:var(--display);font-weight:800;font-size:20px;color:var(--muted);width:32px}
-tr.top .pos,li.top .pos{color:var(--pitch)}
-.pts{font-family:var(--display);font-weight:800;font-size:24px}
+.standings{--edge:16px;--pos-w:22px;font-size:14px}
+.standings tr>:first-child{padding-left:var(--edge)}
+.standings tr>:last-child{padding-right:var(--edge)}
+.standings .player{position:sticky;left:0;z-index:1;background:var(--surface)}
+.standings th.player{padding-left:calc(var(--edge) + var(--pos-w) + 6px)}
+.standings tr.me td{background:var(--a-soft)}
+.standings .who{display:flex;align-items:center;gap:6px}
+.standings .name{overflow:hidden;text-overflow:ellipsis;max-width:120px}
+.standings .pos{flex:none;width:var(--pos-w)}
+.pos{font-family:var(--display);font-weight:800;font-size:18px;color:var(--muted)}
+tr.top .pos{color:var(--pitch)}
+.pts{font-family:var(--display);font-weight:800;font-size:20px}
 .name{font-weight:600}
 .form{display:flex;gap:3px}
 .form span{width:20px;height:20px;border-radius:4px;display:grid;place-items:center;font-size:11px;font-weight:700;color:#fff}
@@ -322,5 +324,11 @@ tr.top .pos,li.top .pos{color:var(--pitch)}
   .hl .card{padding:14px}
   .hl .v{font-size:28px}
   .hl .s{font-size:13px}
+  .standings{--pos-w:28px;font-size:15px}
+  .standings th{padding:6px 8px}
+  .standings td{padding:9px 8px}
+  .standings .name{max-width:none}
+  .pos{font-size:20px}
+  .pts{font-size:24px}
   .score input{width:110px;font-size:60px}
 }
