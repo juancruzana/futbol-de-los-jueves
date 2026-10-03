@@ -1,7 +1,23 @@
 export type Format = "F5" | "F6" | "F7" | "F8" | "F9" | "F11";
 
+export type Role = "admin" | "jugador";
+
+/** Un grupo del que soy parte, con mi rol en él. */
+export type Group = {
+  id: string;
+  name: string;
+  invite_code: string;
+  role: Role;
+};
+
+export type Member = {
+  user_id: string;
+  role: Role;
+};
+
 export type Player = {
   id: string;
+  group_id: string;
   name: string;
   active: boolean;
   user_id: string | null;
@@ -10,6 +26,7 @@ export type Player = {
 
 export type Match = {
   id: string;
+  group_id: string;
   date: string; // YYYY-MM-DD
   format: Format;
   status: "abierto" | "jugado";
@@ -41,4 +58,5 @@ export type Data = {
   matches: Match[];
   availability: Availability[];
   lineups: Lineup[];
+  members: Member[];
 };

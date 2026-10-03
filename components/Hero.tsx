@@ -39,7 +39,7 @@ export default function Hero({ ctx }: { ctx: Ctx }) {
     const answered = p.toy.length + p.notoy.length;
     return (
       <header className="pitch">
-        <div className="eyebrow">Encuesta de horario · {m.format}</div>
+        <div className="eyebrow"><span className="pill">Encuesta abierta</span> · {m.format}</div>
         <h1>{dayLabel(m.date)}</h1>
         <div className="pitch-row">
           <div>
@@ -84,14 +84,14 @@ export default function Hero({ ctx }: { ctx: Ctx }) {
 }
 
 export function NewMatchButton({ ctx, className = "" }: { ctx: Ctx; className?: string }) {
-  const { supabase, run, data, setTab } = ctx;
+  const { supabase, run, data, setTab, group } = ctx;
   const [busy, setBusy] = useState(false);
   async function create() {
     const P = playedMatches(data.matches);
     const last = P[P.length - 1];
     setBusy(true);
     const ok = await run(
-      () => supabase.from("matches").insert({ format: last?.format ?? "F11", date: new Date().toLocaleDateString("en-CA") }),
+      () => supabase.from("matches").insert({ group_id: group.id, format: last?.format ?? "F11", date: new Date().toLocaleDateString("en-CA") }),
       "Encuesta abierta"
     );
     setBusy(false);

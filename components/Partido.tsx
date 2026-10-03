@@ -420,7 +420,7 @@ function ResultForm({ ctx, m }: { ctx: Ctx; m: Match }) {
       );
       if (up.error) return up;
       return supabase.from("matches").update({
-        score_a: a, score_b: b, mvp, status: "jugado", played_at: new Date().toISOString(),
+        score_a: a, score_b: b, mvp, status: "jugado", played_at: m.played_at ?? new Date().toISOString(),
       }).eq("id", m.id);
     }, "Resultado guardado");
     setBusy(false);
@@ -492,9 +492,8 @@ export default function Partido({ ctx }: { ctx: Ctx }) {
   if (!data.players.length) {
     return (
       <div className="card empty">
-        <h2>Cargá el plantel</h2>
-        <p className="muted">Primero hacen falta los jugadores del grupo.</p>
-        {isAdmin && <button className="btn" onClick={() => ctx.setTab("plantel")}>Agregar jugadores</button>}
+        <h2>Todavía no hay jugadores</h2>
+        <p className="muted">Pasale el link de invitación al grupo (está en Plantel): cada uno se suma entrando con su Google.</p>
       </div>
     );
   }
@@ -513,6 +512,16 @@ export default function Partido({ ctx }: { ctx: Ctx }) {
   }
 
   const hasTeams = data.lineups.some((l) => l.match_id === m.id);
+
+  // Partido ya jugado que se reabrió desde Historial: solo equipos y resultado.
+  if (m.played_at) {
+    return (
+      <>
+        {m.time && <Teams ctx={ctx} m={m} />}
+        {hasTeams && isAdmin && <ResultForm ctx={ctx} m={m} key={`res-${m.id}`} />}
+      </>
+    );
+  }
 
   return (
     <>

@@ -3,6 +3,7 @@
 import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { NEXT_COOKIE, safeNext } from "@/lib/next";
 
 function GoogleIcon() {
   return (
@@ -17,55 +18,40 @@ function GoogleIcon() {
 
 function LoginInner() {
   const params = useSearchParams();
-  const [email, setEmail] = useState("");
-  const [state, setState] = useState<"idle" | "sending" | "sent">("idle");
-  const [error, setError] = useState(params.get("error") ? "No se pudo iniciar sesión. Probá de nuevo." : "");
-  const [emailErr, setEmailErr] = useState("");
-  const redirectTo = () => `${window.location.origin}/auth/callback`;
-  const validEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+  const errorParam = params.get("error");
+  const next = safeNext(params.get("next"));
+  const invited = next?.startsWith("/unirse/");
+  const [error, setError] = useState(
+    errorParam === "provider"
+      ? "Solo se puede entrar con Google."
+      : errorParam
+        ? "No se pudo iniciar sesión. Probá de nuevo."
+        : ""
+  );
 
   async function google() {
     setError("");
+    // Google vuelve siempre a /auth/callback; desde ahí sigo hacia `next`.
+    document.cookie = next
+      ? `${NEXT_COOKIE}=${encodeURIComponent(next)}; path=/; max-age=600; samesite=lax`
+      : `${NEXT_COOKIE}=; path=/; max-age=0`;
     const { error } = await createClient().auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: redirectTo() },
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
     });
-    if (error) setError("No se pudo abrir Google. Probá con el mail.");
-  }
-
-  async function magic(e: React.FormEvent) {
-    e.preventDefault();
-    if (!validEmail(email)) {
-      setEmailErr(email.trim() ? "Ese mail no parece válido. Revisalo." : "Escribí tu mail.");
-      return;
-    }
-    setEmailErr("");
-    setError("");
-    setState("sending");
-    const { error } = await createClient().auth.signInWithOtp({
-      email: email.trim(),
-      options: { emailRedirectTo: redirectTo() },
-    });
-    if (error) {
-      setState("idle");
-      setError(
-        error.status === 429
-          ? "Se mandaron muchos mails seguidos. Esperá un minuto y probá de nuevo."
-          : "No se pudo mandar el mail. Revisá la dirección."
-      );
-      return;
-    }
-    setState("sent");
+    if (error) setError("No se pudo abrir Google. Probá de nuevo.");
   }
 
   return (
     <main className="login">
       <div className="box">
         <header className="pitch">
-          <div className="eyebrow">El grupo de los jueves</div>
+          <div className="eyebrow">{invited ? "Te invitaron a un grupo" : "El fútbol de tu grupo"}</div>
           <h1>Fútbol de los Jueves</h1>
           <p style={{ margin: "10px 0 0", opacity: 0.9 }}>
-            Votá si vas, elegí tu horario y mirá cómo viene la tabla.
+            {invited
+              ? "Entrá con Google y elegí tu nombre para sumarte."
+              : "Votá si vas, elegí tu horario y mirá cómo viene la tabla."}
           </p>
         </header>
 
@@ -73,40 +59,6 @@ function LoginInner() {
           <button className="gbtn" onClick={google} id="google">
             <GoogleIcon /> Entrar con Google
           </button>
-
-          <div className="or">o con tu mail</div>
-
-          {state === "sent" ? (
-            <p className="ok">
-              Listo. Te mandamos un link a <b>{email}</b>. Abrilo desde este mismo celular para entrar.
-            </p>
-          ) : (
-            <form onSubmit={magic} noValidate style={{ display: "grid", gap: 10 }}>
-              <div className="field">
-                <label htmlFor="email">Mail</label>
-                <input
-                  id="email"
-                  type="email"
-                  inputMode="email"
-                  autoComplete="email"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  enterKeyHint="send"
-                  placeholder="vos@gmail.com"
-                  value={email}
-                  aria-invalid={!!emailErr}
-                  aria-describedby={emailErr ? "email-err" : undefined}
-                  onChange={(e) => { setEmail(e.target.value); if (emailErr && validEmail(e.target.value)) setEmailErr(""); }}
-                  onBlur={() => email.trim() && !validEmail(email) && setEmailErr("Ese mail no parece válido. Revisalo.")}
-                />
-                {emailErr && <p className="err" id="email-err" role="alert">{emailErr}</p>}
-              </div>
-              <button className="btn full" disabled={state === "sending"}>
-                {state === "sending" ? "Mandando…" : "Mandarme el link"}
-              </button>
-            </form>
-          )}
 
           {error && <p className="err" role="alert">{error}</p>}
         </section>

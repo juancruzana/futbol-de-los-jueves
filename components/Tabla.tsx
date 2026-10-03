@@ -6,8 +6,15 @@ import type { Ctx } from "./ctx";
 const LETTER: Record<Result, string> = { W: "G", D: "E", L: "P" };
 
 function Streak({ n }: { n: number }) {
-  if (!n) return <span className="muted">—</span>;
-  return n >= 3 ? <span className="fire">{n} al hilo</span> : <>{n} al hilo</>;
+  return (
+    <span
+      className={`streak ${n ? "on" : "off"} ${n >= 3 ? "hot" : ""}`}
+      title={`${n} ${n === 1 ? "partido seguido" : "partidos seguidos"} presente`}
+    >
+      <span aria-hidden>🔥</span>
+      <span className="num">{n}</span>
+    </span>
+  );
 }
 
 function Form({ form }: { form: Result[] }) {
@@ -100,13 +107,16 @@ export default function Tabla({ ctx }: { ctx: Ctx }) {
             <li key={r.id} className={`${i < 3 ? "top" : ""} ${r.id === meId ? "me" : ""}`}>
               <span className="pos num">{i + 1}</span>
               <div className="who">
-                <span className="name">{r.name}{r.id === meId && <span className="small muted"> (vos)</span>}</span>
+                <span className="name-row">
+                  <span className="name">{r.name}{r.id === meId && <span className="small muted"> (vos)</span>}</span>
+                  <Streak n={r.attend} />
+                </span>
                 <span className="meta num">
                   <span><b>{r.pj}</b> PJ</span>
                   <span><b>{r.w}‑{r.d}‑{r.l}</b></span>
-                  {r.goles > 0 && <span><b>{r.goles}</b> ⚽</span>}
-                  {r.mvp > 0 && <span><b>{r.mvp}</b> fig.</span>}
-                  <span className="streak"><Streak n={r.attend} /></span>
+                  <span><b>{r.goles}</b> {r.goles === 1 ? "gol" : "goles"}</span>
+                  {r.mvp > 0 && <span className="fig"><b>{r.mvp}</b> {r.mvp === 1 ? "figura" : "figuras"}</span>}
+                  <span><b>{r.pct}%</b> asistencia</span>
                 </span>
                 <Form form={r.form} />
               </div>
@@ -137,7 +147,7 @@ export default function Tabla({ ctx }: { ctx: Ctx }) {
                   <td className="n">{r.mvp}</td>
                   <td className="n">{r.pct}%</td>
                   <td><Form form={r.form} /></td>
-                  <td className="streak"><Streak n={r.attend} /></td>
+                  <td><Streak n={r.attend} /></td>
                 </tr>
               ))}
             </tbody>
@@ -145,8 +155,8 @@ export default function Tabla({ ctx }: { ctx: Ctx }) {
         </div>
         <div className="legend">
           <span className="only-mob"><b>PJ</b> jugados · <b>G‑E‑P</b> ganados, empatados, perdidos</span>
-          <span className="only-desk"><b>Asist.</b> % de los {total} partidos jugados</span>
-          <span><b>Al hilo</b> partidos seguidos presente</span>
+          <span><b>Asistencia</b> % de los {total} partidos jugados</span>
+          <span><b>🔥 Racha</b> partidos seguidos presente</span>
         </div>
       </section>
 
