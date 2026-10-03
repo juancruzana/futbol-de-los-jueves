@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   FORMATS, balanceTeams, computeStats, dayLabel, hs, openMatch, pollSummary, sortSlots,
 } from "@/lib/stats";
@@ -53,30 +53,61 @@ function Option(props: {
 }
 
 /* ---------- Encuesta personal ---------- */
+type Vote = { going: boolean; hours: string[] } | null;
+
 function Poll({ ctx, m }: { ctx: Ctx; m: Match }) {
   const { data, supabase, run, isAdmin, meId, pname } = ctx;
-  const p = pollSummary(m, data);
+  // Votos tocados que el servidor todavía no confirmó: se muestran al instante, sin esperar la vuelta.
+  const [drafts, setDrafts] = useState<Map<string, Vote>>(() => new Map());
+  const view = useMemo(() => {
+    if (!drafts.size) return data;
+    const rest = data.availability.filter((a) => a.match_id !== m.id || !drafts.has(a.player_id));
+    const local = [...drafts].flatMap(([player_id, v]) => (v ? [{ match_id: m.id, player_id, ...v }] : []));
+    return { ...data, availability: [...rest, ...local] };
+  }, [data, drafts, m.id]);
+  const p = pollSummary(m, view);
   const need = FORMATS[m.format] ?? 22;
   const [voterSel, setVoterSel] = useState<string>("");
   const voter = isAdmin && voterSel ? voterSel : meId;
   const mine = voter ? p.votes.get(voter) : undefined;
-  const [busy, setBusy] = useState(false);
 
   const maxA = Math.max(1, p.toy.length, p.notoy.length);
   const maxH = Math.max(1, ...p.slots.map((s) => p.bySlot[s].length));
 
-  async function save(next: { going: boolean; hours: string[] } | null) {
+  // Una escritura por vez y solo la última de cada jugador: si toca rápido, no se pisan en el servidor.
+  const queue = useRef(new Map<string, Vote>());
+  const flushing = useRef(false);
+  async function flush() {
+    if (flushing.current) return;
+    flushing.current = true;
+    while (queue.current.size) {
+      const [id, next] = [...queue.current][0];
+      queue.current.delete(id);
+      const ok = await run(() =>
+        next
+          ? supabase.from("availability").upsert({
+              match_id: m.id, player_id: id, going: next.going, hours: next.hours,
+              updated_at: new Date().toISOString(),
+            })
+          : supabase.from("availability").delete().eq("match_id", m.id).eq("player_id", id)
+      );
+      // Si falló, descarto lo que siguió tocando y vuelvo a lo que dice el servidor.
+      if (!ok) queue.current.delete(id);
+      if (!queue.current.has(id)) {
+        setDrafts((d) => {
+          const n = new Map(d);
+          n.delete(id);
+          return n;
+        });
+      }
+    }
+    flushing.current = false;
+  }
+  function save(next: Vote) {
     if (!voter) return;
-    setBusy(true);
-    await run(() =>
-      next
-        ? supabase.from("availability").upsert({
-            match_id: m.id, player_id: voter, going: next.going, hours: next.hours,
-            updated_at: new Date().toISOString(),
-          })
-        : supabase.from("availability").delete().eq("match_id", m.id).eq("player_id", voter)
-    );
-    setBusy(false);
+    setDrafts((d) => new Map(d).set(voter, next));
+    queue.current.set(voter, next);
+    flush();
   }
   const toy = () => save(mine?.going ? null : { going: true, hours: mine?.hours ?? [] });
   const notoy = () => save(mine && !mine.going ? null : { going: false, hours: [] });
@@ -85,7 +116,7 @@ function Poll({ ctx, m }: { ctx: Ctx; m: Match }) {
     save({ going: true, hours: cur.includes(s) ? cur.filter((x) => x !== s) : sortSlots([...cur, s]) });
   };
 
-  const disabled = !voter || busy;
+  const disabled = !voter;
   const voterName = voter ? pname(voter) : "";
 
   return (

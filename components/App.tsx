@@ -111,7 +111,12 @@ export default function App({
     window.scrollTo({ top: 0 });
   }, []);
 
+  // Numero cada carga: si una vieja vuelve después de una más nueva, la descarto.
+  const loadSeq = useRef(0);
+  const shownSeq = useRef(0);
+
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
     const mem = await supabase
       .from("group_members")
       .select("role, groups(id, name, invite_code)")
@@ -150,11 +155,13 @@ export default function App({
     ]);
     // Si mientras cargaba se cambió de grupo, esta respuesta ya no sirve.
     if (groupRef.current !== gid) return;
+    if (seq < shownSeq.current) return;
     const err = p.error || m.error || a.error || l.error || mb.error;
     if (err) {
       setLoadError("No se pudieron cargar los datos. Revisá la conexión y recargá.");
       return;
     }
+    shownSeq.current = seq;
     setLoadError("");
     setGroups(gs);
     setGroupId(gid);
