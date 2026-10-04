@@ -337,6 +337,28 @@ begin
   end if;
 end $$;
 
+create or replace function remove_player(p_player uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_group uuid;
+  v_user uuid;
+begin
+  select group_id, user_id into v_group, v_user from players where id = p_player;
+  if v_group is null then
+    raise exception 'Ese jugador ya no está en el plantel';
+  end if;
+  if not is_group_admin(v_group) then
+    raise exception 'Solo el organizador puede eliminar jugadores';
+  end if;
+  if v_user = auth.uid() then
+    raise exception 'No te podés eliminar a vos mismo';
+  end if;
+  delete from players where id = p_player;
+  if v_user is not null then
+    delete from group_members where group_id = v_group and user_id = v_user;
+  end if;
+end $$;
+
 grant execute on function is_member(uuid)                      to authenticated;
 grant execute on function is_group_admin(uuid)                 to authenticated;
 grant execute on function my_player_id(uuid)                   to authenticated;
@@ -347,6 +369,7 @@ grant execute on function create_my_player(uuid, text)         to authenticated;
 grant execute on function update_my_profile(uuid, text)        to authenticated;
 grant execute on function reset_invite(uuid)                   to authenticated;
 grant execute on function set_member_role(uuid, uuid, text)    to authenticated;
+grant execute on function remove_player(uuid)                  to authenticated;
 
 -- ---------- RLS ----------
 alter table admin_emails  enable row level security;
@@ -386,7 +409,7 @@ create policy "groups: editar" on groups for update to authenticated
   using (is_group_admin(id)) with check (is_group_admin(id));
 
 -- group_members: los del grupo ven quién está y quién organiza.
--- Se escribe solo por funciones (join_group, set_member_role).
+-- Se escribe solo por funciones (join_group, set_member_role, remove_player).
 drop policy if exists "members: leer" on group_members;
 create policy "members: leer" on group_members for select to authenticated using (is_member(group_id));
 

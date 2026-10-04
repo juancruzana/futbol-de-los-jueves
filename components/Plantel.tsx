@@ -107,10 +107,12 @@ function GroupName({ ctx }: { ctx: Ctx }) {
 
 export default function Plantel({ ctx }: { ctx: Ctx }) {
   const { data, group, isAdmin, supabase, run, meId, userId } = ctx;
+  const [confirmDel, setConfirmDel] = useState<string | null>(null);
   const act = data.players.filter((p) => p.active).sort((a, b) => a.name.localeCompare(b.name));
   const inact = data.players.filter((p) => !p.active).sort((a, b) => a.name.localeCompare(b.name));
   const role = new Map(data.members.map((m) => [m.user_id, m.role]));
   const admins = data.members.filter((m) => m.role === "admin").length;
+  const played = new Set(data.matches.filter((m) => m.status === "jugado").map((m) => m.id));
 
   const toggle = (id: string, active: boolean) =>
     run(() => supabase.from("players").update({ active: !active }).eq("id", id));
@@ -119,6 +121,10 @@ export default function Plantel({ ctx }: { ctx: Ctx }) {
       () => supabase.rpc("set_member_role", { p_group: group.id, p_user: user, p_role: next }),
       next === "admin" ? `${who} ahora es organizador` : `${who} ya no es organizador`
     );
+  async function remove(id: string, who: string) {
+    await run(() => supabase.rpc("remove_player", { p_player: id }), `${who} ya no está en el plantel`);
+    setConfirmDel(null);
+  }
 
   return (
     <>
@@ -134,11 +140,11 @@ export default function Plantel({ ctx }: { ctx: Ctx }) {
               return (
                 <div key={p.id} className="pl">
                   <span className="nm">
-                    {p.name}
-                    {isMe && <span className="small muted"> (vos)</span>}
+                    <span className="pn">{p.name}</span>
+                    {isMe && <span className="small muted">(vos)</span>}
+                    {org && <span className="badge">Organizador</span>}
                   </span>
                   <span className="acts">
-                    {org && <span className="badge">Organizador</span>}
                     {!p.user_id && <span className="small muted" title="Jugador sin cuenta">Sin cuenta</span>}
                     {isAdmin && p.user_id && role.has(p.user_id) && (org ? admins > 1 : true) && (
                       <button className="swap" onClick={() => setRole(p.user_id!, org ? "jugador" : "admin", isMe ? "Vos" : p.name)}>
@@ -154,6 +160,9 @@ export default function Plantel({ ctx }: { ctx: Ctx }) {
         ) : (
           <p className="muted">Todavía no entró nadie. Pasales el link de invitación.</p>
         )}
+        {isAdmin && act.length > 0 && (
+          <p className="hint" style={{ marginTop: 12 }}>Para eliminar a alguien, primero dalo de baja.</p>
+        )}
       </section>
 
       {inact.length > 0 && (
@@ -161,12 +170,32 @@ export default function Plantel({ ctx }: { ctx: Ctx }) {
           <h2>De baja</h2>
           <p className="muted small">Siguen en el historial pero no aparecen en la encuesta.</p>
           <div className="roster">
-            {inact.map((p) => (
-              <div key={p.id} className="pl">
-                <span className="nm">{p.name}</span>
-                {isAdmin && <button className="swap" onClick={() => toggle(p.id, p.active)}>Reincorporar</button>}
-              </div>
-            ))}
+            {inact.map((p) => {
+              const pj = data.lineups.filter((l) => l.player_id === p.id && played.has(l.match_id)).length;
+              return (
+                <div key={p.id} className="pl">
+                  <span className="nm"><span className="pn">{p.name}</span></span>
+                  {isAdmin && (confirmDel === p.id ? (
+                    <div className="confirm">
+                      <p className="small">
+                        ¿Eliminar a {p.name} para siempre?
+                        {pj > 0 && ` Se borra de la tabla y de ${pj === 1 ? "el partido que jugó" : `los ${pj} partidos que jugó`}.`}
+                        {p.user_id && " También sale del grupo."} No se puede deshacer.
+                      </p>
+                      <button className="btn ghost" onClick={() => setConfirmDel(null)}>No</button>
+                      <button className="btn danger" onClick={() => remove(p.id, p.name)}>Sí, eliminar</button>
+                    </div>
+                  ) : (
+                    <span className="acts">
+                      <button className="swap" onClick={() => toggle(p.id, p.active)}>Reincorporar</button>
+                      {p.id !== meId && (
+                        <button className="swap danger" onClick={() => setConfirmDel(p.id)}>Eliminar</button>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              );
+            })}
           </div>
         </section>
       )}

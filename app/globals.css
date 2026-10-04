@@ -261,8 +261,13 @@ tr.top .pos{color:var(--pitch)}
 
 /* Plantel */
 .roster{display:grid;gap:8px}
-.pl{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 8px;min-height:56px;padding:6px 6px 6px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface);min-width:0}
-.pl .nm{flex:1 1 120px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.pl{display:flex;flex-wrap:wrap;align-items:center;align-content:center;justify-content:space-between;gap:6px 8px;min-height:56px;padding:6px 6px 6px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface);min-width:0}
+.pl .nm{flex:1 1 120px;display:flex;align-items:center;gap:6px;font-weight:600;min-width:0}
+.pl .nm>*{flex:none}
+.pl .nm .pn{flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+/* Si los botones no entran al lado del nombre bajan a otra línea, y si tampoco entran juntos se parten */
+.pl .acts{flex:0 1 auto;flex-wrap:wrap;justify-content:flex-end}
+.swap.danger{color:var(--loss)}
 
 .empty{text-align:center;padding:28px 16px}
 .empty h2{margin-bottom:6px}
@@ -289,8 +294,6 @@ tr.top .pos{color:var(--pitch)}
   .match{grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"d info res"}
   .match .info{padding-top:0;border-top:0}
   .danger-zone{justify-items:start}
-  .login{align-items:center}
-  .login .box>.card{margin-top:0}
 }
 
 /* ---------- Escritorio: la navegación sube a pestañas ---------- */

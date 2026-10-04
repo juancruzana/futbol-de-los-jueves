@@ -208,6 +208,31 @@ r = await asFacu(`select update_my_profile($1, $2)`, [G2, "Facundo"]);
 r = await asFacu(`select (select name from players where id = $1) a, (select name from players where id = $2) b`, [id.Facu, id.FacuG2]);
 check("el nombre se cambia por grupo", r.rows?.[0].a === "Facu" && r.rows[0].b === "Facundo");
 
+// Eliminar jugadores
+r = await asFacu(`select remove_player($1)`, [id.Ruso]);
+check("un jugador NO puede eliminar a otro", !!r.error && /Solo el organizador/.test(r.error));
+r = await asLucho(`select remove_player($1)`, [id.Tomi]);
+check("el organizador de otro grupo NO elimina jugadores de este", !!r.error && /Solo el organizador/.test(r.error));
+r = await asAdmin(`select remove_player($1)`, [id.Juan]);
+check("el organizador NO se puede eliminar a sí mismo", !!r.error && /vos mismo/.test(r.error));
+await asAdmin(`update matches set mvp = $2 where id = $1`, [mid, id.Ruso]);
+r = await asAdmin(`select remove_player($1)`, [id.Ruso]);
+check("el organizador elimina a un jugador sin cuenta", !r.error);
+r = await asAdmin(`select (select count(*)::int from players where id = $1) p, (select count(*)::int from lineups where player_id = $1) l,
+  (select count(*)::int from availability where player_id = $1) a, (select count(*)::int from matches where id = $2) m,
+  (select mvp from matches where id = $2) mvp`, [id.Ruso, mid]);
+check("se borran sus votos, sus equipos y la figura, pero el partido queda",
+  r.rows?.[0].p === 0 && r.rows[0].l === 0 && r.rows[0].a === 0 && r.rows[0].m === 1 && r.rows[0].mvp === null);
+r = await asAdmin(`select remove_player($1)`, [id.Ruso]);
+check("eliminar a alguien que ya no está avisa", !!r.error && /ya no está/.test(r.error));
+r = await asAdmin(`select remove_player($1)`, [id.Tomi]);
+check("el organizador elimina a un jugador con cuenta", !r.error);
+r = await asTomi(`select (select count(*)::int from groups where id = $1) g, (select count(*)::int from players where group_id = $1) p`, [G1]);
+check("el eliminado queda afuera del grupo", r.rows?.[0].g === 0 && r.rows[0].p === 0);
+r = await asLucho(`select remove_player($1)`, [id.FacuG2]);
+r = await asFacu(`select (select count(*)::int from group_members where user_id = $1) g, (select count(*)::int from players where id = $2) p`, [FACU, id.Facu]);
+check("eliminarlo de un grupo no lo saca de los otros", r.rows?.[0].g === 1 && r.rows[0].p === 1);
+
 r = await asFacu(`select * from admin_emails`);
 check("la lista de organizadores de antes no es legible", !!r.error || r.rows.length === 0);
 
