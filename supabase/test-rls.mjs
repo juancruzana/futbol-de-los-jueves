@@ -159,6 +159,47 @@ check("el organizador cierra el partido", !r.error && r.n === 1);
 r = await asFacu(`update availability set hours='{20:00}' where match_id=$1 and player_id=$2`, [mid, id.Facu]);
 check("con el partido cerrado ya no se puede cambiar el voto", !r.error && r.n === 0);
 
+// Votación de la figura (jugaron Facu, Ruso y Juan; Tomi no)
+await asAdmin(`insert into lineups(match_id,player_id,team) values ($1,$2,'A')`, [mid, id.Juan]);
+const mvpVote = (as, voter, player) =>
+  as(`insert into mvp_votes(match_id,voter_id,player_id) values ($1,$2,$3)
+      on conflict (match_id,voter_id) do update set player_id = excluded.player_id returning group_id`, [mid, voter, player]);
+r = await mvpVote(asFacu, id.Facu, id.Juan);
+check("sin votación abierta no se puede votar la figura", !!r.error);
+r = await asFacu(`update matches set mvp_vote='abierta' where id=$1`, [mid]);
+check("un jugador NO puede abrir la votación de la figura (0 filas)", !r.error && r.n === 0);
+r = await asAdmin(`update matches set mvp_vote='abierta' where id=$1`, [mid]);
+check("el organizador abre la votación de la figura", !r.error && r.n === 1);
+r = await mvpVote(asFacu, id.Facu, id.Juan);
+check("Facu, que jugó, vota la figura (y el voto toma el grupo del partido)", !r.error && r.rows[0].group_id === G1);
+r = await mvpVote(asFacu, id.Facu, id.Ruso);
+check("Facu cambia su voto", !r.error);
+r = await mvpVote(asFacu, id.Facu, id.Tomi);
+check("NO se puede votar a alguien que no jugó", !!r.error);
+r = await mvpVote(asTomi, id.Tomi, id.Facu);
+check("el que no jugó NO vota la figura", !!r.error);
+r = await mvpVote(asAdmin, id.Juan, id.Juan);
+check("se puede votar a uno mismo", !r.error);
+r = await mvpVote(asAdmin, id.Ruso, id.Facu);
+check("ni el organizador puede votar en nombre de otro", !!r.error);
+await mvpVote(asAdmin, id.Juan, id.Ruso);
+r = await asTomi(`select count(*)::int c from mvp_votes where match_id=$1`, [mid]);
+check("con la votación abierta, un jugador NO ve los votos de otros", r.rows?.[0].c === 0);
+r = await asFacu(`select player_id from mvp_votes where match_id=$1`, [mid]);
+check("cada uno ve su propio voto", r.rows?.length === 1 && r.rows[0].player_id === id.Ruso);
+r = await asAdmin(`select count(*)::int c from mvp_votes where match_id=$1`, [mid]);
+check("el organizador ve cómo va la votación", r.rows?.[0].c === 2);
+r = await asLucho(`select count(*)::int c from mvp_votes`);
+check("alguien de otro grupo NO ve votos de figura", r.rows?.[0].c === 0);
+r = await asAdmin(`update matches set mvp_vote='cerrada', mvp=$2 where id=$1`, [mid, id.Ruso]);
+check("el organizador cierra la votación con el más votado", !r.error && r.n === 1);
+r = await asTomi(`select count(*)::int c from mvp_votes where match_id=$1`, [mid]);
+check("cerrada la votación, todo el grupo ve el resultado", r.rows?.[0].c === 2);
+r = await asFacu(`update mvp_votes set player_id=$3 where match_id=$1 and voter_id=$2`, [mid, id.Facu, id.Juan]);
+check("cerrada la votación ya no se puede cambiar el voto (0 filas)", !r.error && r.n === 0);
+r = await asFacu(`delete from mvp_votes where match_id=$1 and voter_id=$2`, [mid, id.Facu]);
+check("cerrada la votación ya no se puede borrar el voto (0 filas)", !r.error && r.n === 0);
+
 // Organizadores
 r = await asFacu(`select set_member_role($1, $2, 'admin')`, [G1, FACU]);
 check("un jugador NO puede nombrarse organizador", !!r.error);
@@ -223,6 +264,8 @@ r = await asAdmin(`select (select count(*)::int from players where id = $1) p, (
   (select mvp from matches where id = $2) mvp`, [id.Ruso, mid]);
 check("se borran sus votos, sus equipos y la figura, pero el partido queda",
   r.rows?.[0].p === 0 && r.rows[0].l === 0 && r.rows[0].a === 0 && r.rows[0].m === 1 && r.rows[0].mvp === null);
+r = await asAdmin(`select count(*)::int c from mvp_votes where player_id = $1 or voter_id = $1`, [id.Ruso]);
+check("y también los votos de figura que recibió", r.rows?.[0].c === 0);
 r = await asAdmin(`select remove_player($1)`, [id.Ruso]);
 check("eliminar a alguien que ya no está avisa", !!r.error && /ya no está/.test(r.error));
 r = await asAdmin(`select remove_player($1)`, [id.Tomi]);

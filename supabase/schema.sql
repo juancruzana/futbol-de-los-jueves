@@ -54,6 +54,7 @@ create table if not exists matches (
   score_a     int not null default 0 check (score_a >= 0),
   score_b     int not null default 0 check (score_b >= 0),
   mvp         uuid references players(id) on delete set null,
+  mvp_vote    text check (mvp_vote in ('abierta','cerrada')), -- votación de la figura (null = nunca se abrió)
   created_at  timestamptz not null default now(),
   played_at   timestamptz
 );
@@ -137,6 +138,24 @@ begin
   end if;
 end $$;
 
+-- ---------- Votación de la figura ----------
+-- Los que jugaron eligen la figura entre los que jugaron (vale votarse a uno mismo).
+-- Un voto por jugador; el organizador cierra la votación y elige al más votado.
+alter table matches add column if not exists mvp_vote text check (mvp_vote in ('abierta','cerrada'));
+
+create table if not exists mvp_votes (
+  match_id    uuid not null references matches(id) on delete cascade,
+  voter_id    uuid not null,
+  player_id   uuid not null,
+  group_id    uuid not null references groups(id) on delete cascade,
+  updated_at  timestamptz not null default now(),
+  primary key (match_id, voter_id),
+  foreign key (voter_id, group_id)  references players (id, group_id) on delete cascade,
+  foreign key (player_id, group_id) references players (id, group_id) on delete cascade
+);
+-- Antes no se podía votar a uno mismo.
+alter table mvp_votes drop constraint if exists mvp_votes_check;
+
 -- ---------- Triggers ----------
 -- Votos y equipos heredan el grupo del partido (nadie lo elige a mano).
 create or replace function set_group_from_match() returns trigger
@@ -151,6 +170,9 @@ create trigger availability_group before insert or update on availability
   for each row execute function set_group_from_match();
 drop trigger if exists lineups_group on lineups;
 create trigger lineups_group before insert or update on lineups
+  for each row execute function set_group_from_match();
+drop trigger if exists mvp_votes_group on mvp_votes;
+create trigger mvp_votes_group before insert or update on mvp_votes
   for each row execute function set_group_from_match();
 
 -- Un jugador o un partido no se puede mudar de grupo.
@@ -379,6 +401,7 @@ alter table players       enable row level security;
 alter table matches       enable row level security;
 alter table availability  enable row level security;
 alter table lineups       enable row level security;
+alter table mvp_votes     enable row level security;
 
 -- Políticas de antes de los grupos (dependen de funciones que ya no existen).
 drop policy if exists "admins leen"    on admin_emails;
@@ -452,12 +475,35 @@ create policy "avail: propio" on availability for all to authenticated
 create policy "avail: admin" on availability for all to authenticated
   using (is_group_admin(group_id)) with check (is_group_admin(group_id));
 
+-- mvp_votes: el voto es secreto mientras la votación está abierta (cada uno ve
+-- el suyo y el organizador ve cómo va); al cerrarla lo ve todo el grupo.
+-- Vota solo quien jugó, por alguien que jugó, y nadie vota por otro.
+drop policy if exists "mvp: leer"  on mvp_votes;
+drop policy if exists "mvp: votar" on mvp_votes;
+create policy "mvp: leer" on mvp_votes for select to authenticated
+  using (
+    voter_id = my_player_id(group_id)
+    or is_group_admin(group_id)
+    or (is_member(group_id) and exists (select 1 from matches m where m.id = match_id and m.mvp_vote = 'cerrada'))
+  );
+create policy "mvp: votar" on mvp_votes for all to authenticated
+  using (
+    voter_id = my_player_id(group_id)
+    and exists (select 1 from matches m where m.id = match_id and m.status = 'jugado' and m.mvp_vote = 'abierta')
+  )
+  with check (
+    voter_id = my_player_id(group_id)
+    and exists (select 1 from matches m where m.id = match_id and m.status = 'jugado' and m.mvp_vote = 'abierta')
+    and exists (select 1 from lineups l where l.match_id = mvp_votes.match_id and l.player_id = mvp_votes.voter_id)
+    and exists (select 1 from lineups l where l.match_id = mvp_votes.match_id and l.player_id = mvp_votes.player_id)
+  );
+
 -- ---------- Tiempo real ----------
 -- Para que la encuesta se actualice sola en todos los celulares.
 do $$
 declare t text;
 begin
-  foreach t in array array['groups','group_members','players','matches','availability','lineups'] loop
+  foreach t in array array['groups','group_members','players','matches','availability','lineups','mvp_votes'] loop
     begin
       execute format('alter publication supabase_realtime add table %I', t);
     exception when duplicate_object then null;

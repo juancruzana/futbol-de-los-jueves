@@ -206,6 +206,8 @@ tr.top .pos{color:var(--pitch)}
 .acts{display:flex;align-items:center;gap:6px;flex:none;margin-left:auto}
 .swap{display:inline-grid;place-items:center;min-width:var(--tap);min-height:var(--tap);padding:0 10px;font-size:13px;font-weight:600;color:var(--muted);border:1px solid var(--line);border-radius:10px;background:var(--surface)}
 .swap.icon{font-size:18px;padding:0}
+/* Con muchos botones (editar partido) se parten en dos líneas si no entran */
+.team li .edit-acts{flex:0 1 auto;flex-wrap:wrap;justify-content:flex-end}
 
 /* Resultado */
 .score{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;margin:4px 0 16px}
@@ -257,7 +259,7 @@ tr.top .pos{color:var(--pitch)}
 .match .info{grid-area:info;min-width:0;display:grid;gap:2px;padding-top:10px;border-top:1px solid var(--line)}
 .match .res{grid-area:res;font-family:var(--display);font-weight:800;font-size:34px;line-height:1}
 .mini{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
-.match-acts{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+.match-acts{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-top:12px}
 
 /* Plantel */
 .roster{display:grid;gap:8px}

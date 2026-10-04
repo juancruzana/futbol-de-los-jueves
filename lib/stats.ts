@@ -43,6 +43,19 @@ export const openMatch = (matches: Match[]) =>
     .filter((m) => m.status === "abierto")
     .sort((a, b) => b.created_at.localeCompare(a.created_at))[0] ?? null;
 
+/* ---------- Votación de la figura ---------- */
+export const mvpVoteOpen = (m: Match) => m.status === "jugado" && m.mvp_vote === "abierta";
+
+/** ¿Jugué algún partido con la votación de figura abierta y todavía no voté? */
+export function pendingMvpVote({ matches, lineups, mvpVotes }: Pick<Data, "matches" | "lineups" | "mvpVotes">, me: string) {
+  return matches.some(
+    (m) =>
+      mvpVoteOpen(m) &&
+      lineups.some((l) => l.match_id === m.id && l.player_id === me) &&
+      !mvpVotes.some((v) => v.match_id === m.id && v.voter_id === me)
+  );
+}
+
 export type Result = "W" | "D" | "L";
 
 export type PlayerStats = {

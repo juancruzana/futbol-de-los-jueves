@@ -35,6 +35,8 @@ export type Match = {
   score_a: number;
   score_b: number;
   mvp: string | null;
+  /** votación de la figura entre los que jugaron (null = nunca se abrió) */
+  mvp_vote: "abierta" | "cerrada" | null;
   created_at: string;
   played_at: string | null;
 };
@@ -53,10 +55,19 @@ export type Lineup = {
   goals: number;
 };
 
+/** Voto de figura: quién votó a quién. */
+export type MvpVote = {
+  match_id: string;
+  voter_id: string;
+  player_id: string;
+};
+
 export type Data = {
   players: Player[];
   matches: Match[];
   availability: Availability[];
   lineups: Lineup[];
+  /** la RLS solo deja ver los votos de figura propios, salvo al organizador o con la votación cerrada */
+  mvpVotes: MvpVote[];
   members: Member[];
 };

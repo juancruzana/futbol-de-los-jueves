@@ -413,6 +413,24 @@ function Teams({ ctx, m }: { ctx: Ctx; m: Match }) {
 }
 
 /* ---------- Resultado ---------- */
+// Teclado numérico para tipear el marcador directo; los −/+ quedan para ajustar.
+export function ScoreSide({ t, label, v, set }: { t: "A" | "B"; label: string; v: number; set: (n: number) => void }) {
+  return (
+    <div className={`side ${t}`}>
+      <label className="lbl" htmlFor={`score-${t}`} style={{ color: `var(--${t.toLowerCase()})` }}>{label}</label>
+      <input
+        id={`score-${t}`} className="num" type="text" inputMode="numeric" pattern="[0-9]*" autoComplete="off"
+        value={v} onFocus={(e) => e.target.select()}
+        onChange={(e) => set(Math.min(99, parseInt(e.target.value.replace(/\D/g, ""), 10) || 0))}
+      />
+      <span className="step">
+        <button onClick={() => set(Math.max(0, v - 1))} aria-label={`Restar gol ${label}`}>−</button>
+        <button onClick={() => set(Math.min(99, v + 1))} aria-label={`Sumar gol ${label}`}>+</button>
+      </span>
+    </div>
+  );
+}
+
 function ResultForm({ ctx, m }: { ctx: Ctx; m: Match }) {
   const { data, supabase, run, pname, setTab } = ctx;
   const rows = data.lineups.filter((l) => l.match_id === m.id);
@@ -472,30 +490,15 @@ function ResultForm({ ctx, m }: { ctx: Ctx; m: Match }) {
     </li>
   );
 
-  // Teclado numérico para tipear el marcador directo; los −/+ quedan para ajustar.
-  const side = (t: "A" | "B", label: string, v: number, set: (n: number) => void) => (
-    <div className={`side ${t}`}>
-      <label className="lbl" htmlFor={`score-${t}`} style={{ color: `var(--${t.toLowerCase()})` }}>{label}</label>
-      <input
-        id={`score-${t}`} className="num" type="text" inputMode="numeric" pattern="[0-9]*" autoComplete="off"
-        value={v} onFocus={(e) => e.target.select()}
-        onChange={(e) => set(Math.min(99, parseInt(e.target.value.replace(/\D/g, ""), 10) || 0))}
-      />
-      <span className="step">
-        <button onClick={() => set(Math.max(0, v - 1))} aria-label={`Restar gol ${label}`}>−</button>
-        <button onClick={() => set(Math.min(99, v + 1))} aria-label={`Sumar gol ${label}`}>+</button>
-      </span>
-    </div>
-  );
   const mismatch = ga > a || gb > b;
 
   return (
     <section className="card">
       <h2>Cargar resultado</h2>
       <div className="score">
-        {side("A", "Verdes", a, setA)}
+        <ScoreSide t="A" label="Verdes" v={a} set={setA} />
         <span className="sep" aria-hidden="true">–</span>
-        {side("B", "Pecheras", b, setB)}
+        <ScoreSide t="B" label="Pecheras" v={b} set={setB} />
       </div>
       <h3 className="sub" style={{ marginTop: 0 }}>Goles y figura</h3>
       <div className="teams">

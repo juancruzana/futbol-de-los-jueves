@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Data, Group } from "@/lib/types";
-import { openMatch } from "@/lib/stats";
+import { openMatch, pendingMvpVote } from "@/lib/stats";
 import type { Ctx, Tab } from "./ctx";
 import Hero, { NewMatchButton } from "./Hero";
 import Tabla from "./Tabla";
@@ -41,7 +41,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
 const initials = (n: string) =>
   n.split(/[\s@.]+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "?";
 
-const EMPTY: Data = { players: [], matches: [], availability: [], lineups: [], members: [] };
+const EMPTY: Data = { players: [], matches: [], availability: [], lineups: [], mvpVotes: [], members: [] };
 
 /** Un menú desplegable se cierra tocando afuera o con Escape. */
 function useDismiss(open: boolean, ref: React.RefObject<HTMLElement | null>, close: () => void) {
@@ -65,12 +65,15 @@ export default function App({
   displayName,
   email,
   initialGroup,
+  initialTab,
 }: {
   userId: string;
   displayName: string;
   email: string;
   /** grupo a abrir (ej. recién sumado con un link de invitación) */
   initialGroup?: string;
+  /** pestaña a abrir (ej. Historial, desde el link para votar la figura) */
+  initialTab?: string;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -99,12 +102,13 @@ export default function App({
 
   useEffect(() => {
     try {
-      const t = localStorage.getItem("fdj-tab") as Tab | null;
-      if (t && TABS.some((x) => x.id === t)) setTabState(t);
+      const t = TABS.find((x) => x.id === (initialTab ?? localStorage.getItem("fdj-tab")))?.id;
+      if (t) setTabState(t);
+      if (t && initialTab) localStorage.setItem("fdj-tab", t);
     } catch {}
-    // El ?g= de la invitación ya se usó: lo saco de la barra de direcciones.
-    if (initialGroup) window.history.replaceState(null, "", "/");
-  }, [initialGroup]);
+    // El ?g= / ?tab= del link ya se usó: lo saco de la barra de direcciones.
+    if (initialGroup || initialTab) window.history.replaceState(null, "", "/");
+  }, [initialGroup, initialTab]);
   const setTab = useCallback((t: Tab) => {
     setTabState(t);
     try { localStorage.setItem("fdj-tab", t); } catch {}
@@ -146,17 +150,18 @@ export default function App({
       return;
     }
 
-    const [p, m, a, l, mb] = await Promise.all([
+    const [p, m, a, l, v, mb] = await Promise.all([
       supabase.from("players").select("*").eq("group_id", gid).order("name"),
       supabase.from("matches").select("*").eq("group_id", gid),
       supabase.from("availability").select("match_id,player_id,going,hours").eq("group_id", gid),
       supabase.from("lineups").select("match_id,player_id,team,goals").eq("group_id", gid),
+      supabase.from("mvp_votes").select("match_id,voter_id,player_id").eq("group_id", gid),
       supabase.from("group_members").select("user_id,role").eq("group_id", gid),
     ]);
     // Si mientras cargaba se cambió de grupo, esta respuesta ya no sirve.
     if (groupRef.current !== gid) return;
     if (seq < shownSeq.current) return;
-    const err = p.error || m.error || a.error || l.error || mb.error;
+    const err = p.error || m.error || a.error || l.error || v.error || mb.error;
     if (err) {
       setLoadError("No se pudieron cargar los datos. Revisá la conexión y recargá.");
       return;
@@ -165,7 +170,7 @@ export default function App({
     setLoadError("");
     setGroups(gs);
     setGroupId(gid);
-    setData({ players: p.data!, matches: m.data!, availability: a.data!, lineups: l.data!, members: mb.data! });
+    setData({ players: p.data!, matches: m.data!, availability: a.data!, lineups: l.data!, mvpVotes: v.data!, members: mb.data! });
     setLoaded(true);
   }, [supabase, userId]);
 
@@ -187,7 +192,7 @@ export default function App({
     let t: ReturnType<typeof setTimeout> | undefined;
     const bump = () => { clearTimeout(t); t = setTimeout(load, 250); };
     const ch = supabase.channel("futbol");
-    ["groups", "group_members", "players", "matches", "availability", "lineups"].forEach((table) =>
+    ["groups", "group_members", "players", "matches", "availability", "lineups", "mvp_votes"].forEach((table) =>
       ch.on("postgres_changes", { event: "*", schema: "public", table }, bump)
     );
     ch.subscribe();
@@ -272,6 +277,7 @@ export default function App({
   const showTabs = loaded && !loadError && !creating && !!ctx && (me || isAdmin);
   const open = openMatch(data.matches);
   const needsVote = !!open && !open.played_at && !!me && !data.availability.some((a) => a.match_id === open.id && a.player_id === me.id);
+  const needsMvpVote = !!me && pendingMvpVote(data, me.id);
   const name = me?.name ?? displayName;
 
   // Acción principal al alcance del pulgar. En "Partido" no hace falta: la acción ya está en pantalla.
@@ -279,6 +285,8 @@ export default function App({
   if (showTabs && ctx && tab !== "partido") {
     if (needsVote) {
       fab = <button className="btn fab" onClick={() => setTab("partido")}>¿Jugás? Votá</button>;
+    } else if (needsMvpVote && tab !== "historial") {
+      fab = <button className="btn fab" onClick={() => setTab("historial")}>Votá la figura</button>;
     } else if (isAdmin && !open && data.players.length > 0) {
       fab = <NewMatchButton ctx={ctx} className="fab" />;
     }
@@ -394,6 +402,7 @@ export default function App({
               <span className="ico">{t.icon}</span>
               {t.label}
               {t.id === "partido" && needsVote && <span className="dot" aria-label="Falta tu voto" />}
+              {t.id === "historial" && needsMvpVote && <span className="dot" aria-label="Falta tu voto de figura" />}
             </button>
           ))}
         </nav>
