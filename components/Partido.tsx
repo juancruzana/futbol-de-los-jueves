@@ -200,6 +200,7 @@ function Organizer({ ctx, m }: { ctx: Ctx; m: Match }) {
   const p = pollSummary(m, data);
   const need = FORMATS[m.format] ?? 22;
   const [newSlot, setNewSlot] = useState("19:00");
+  const [adding, setAdding] = useState(false);
   const maxH = Math.max(0, ...p.slots.map((s) => p.bySlot[s].length));
   const upd = (patch: Partial<Match>, ok?: string) =>
     run(() => supabase.from("matches").update(patch).eq("id", m.id), ok);
@@ -223,6 +224,13 @@ function Organizer({ ctx, m }: { ctx: Ctx; m: Match }) {
   function addSlot() {
     if (!newSlot || dupSlot) return;
     upd({ slots: sortSlots([...p.slots, newSlot]) }, "Horario agregado");
+    setAdding(false);
+  }
+  function startAdding() {
+    // Sugiere una hora después del último horario
+    const h = Number(p.slots[p.slots.length - 1]?.slice(0, 2) ?? 18) + 1;
+    setNewSlot(`${String(h % 24).padStart(2, "0")}:00`);
+    setAdding(true);
   }
 
   return (
@@ -267,19 +275,22 @@ function Organizer({ ctx, m }: { ctx: Ctx; m: Match }) {
                 >×</button>
               </span>
             ))}
+            {adding ? (
+              <span className="slot-add">
+                <input
+                  type="time" step={1800} value={newSlot} autoFocus
+                  aria-label="Nuevo horario"
+                  aria-invalid={dupSlot} aria-describedby={dupSlot ? "newslot-err" : undefined}
+                  onChange={(e) => setNewSlot(e.target.value)}
+                />
+                <button className="btn" disabled={!newSlot || dupSlot} onClick={addSlot}>Agregar</button>
+                <button className="x" aria-label="Cancelar" onClick={() => setAdding(false)}>×</button>
+              </span>
+            ) : (
+              <button className="chip slot add" onClick={startAdding}>+ Agregar</button>
+            )}
           </div>
-          <div className="field">
-            <label htmlFor="newslot">Agregar horario</label>
-            <div className="combo">
-              <input
-                type="time" id="newslot" step={1800} value={newSlot}
-                aria-invalid={dupSlot} aria-describedby={dupSlot ? "newslot-err" : undefined}
-                onChange={(e) => setNewSlot(e.target.value)}
-              />
-              <button className="btn ghost" disabled={!newSlot || dupSlot} onClick={addSlot}>Agregar</button>
-            </div>
-            {dupSlot && <p className="err" id="newslot-err">Ese horario ya está en la encuesta.</p>}
-          </div>
+          {adding && dupSlot && <p className="err" id="newslot-err" style={{ marginBottom: 10 }}>Ese horario ya está en la encuesta.</p>}
 
           <h3 className="sub">Confirmar horario</h3>
           <p className="hint" style={{ marginBottom: 8 }}>

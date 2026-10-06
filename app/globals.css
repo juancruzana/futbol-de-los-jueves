@@ -33,6 +33,10 @@ button{font:inherit;cursor:pointer;border:0;background:none;color:inherit;touch-
 button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:2px solid var(--hot);outline-offset:2px}
 /* 16px en inputs: evita el zoom automático de iOS al enfocar */
 input,select,textarea{font:inherit;font-size:16px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-height:var(--tap);max-width:100%}
+input:not([type=checkbox]):not([type=radio]),select{height:var(--tap);line-height:1.25}
+/* iOS Safari: los date/time nativos tienen ancho mínimo propio y se desbordan de la grilla */
+input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;display:block;min-width:0;text-align:left}
+input::-webkit-date-and-time-value{text-align:left;margin:0}
 input[aria-invalid="true"]{border-color:var(--loss)}
 textarea{width:100%;min-height:150px;resize:vertical;line-height:1.45}
 .muted{color:var(--muted)}
@@ -192,6 +196,10 @@ tr.top .pos{color:var(--pitch)}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
 .chip{display:inline-flex;align-items:center;min-height:32px;padding:4px 12px;border-radius:99px;font-size:13px;font-weight:600;border:1px solid var(--line)}
 .chip.slot{min-height:var(--tap);padding:0 0 0 14px;font-size:15px;background:var(--surface)}
+.chip.slot.add{padding:0 16px;border-style:dashed;color:var(--muted);background:transparent}
+.slot-add{display:inline-flex;align-items:center;gap:6px}
+.slot-add input{width:120px}
+.slot-add .btn{padding:10px 14px}
 .x{display:grid;place-items:center;width:var(--tap);height:var(--tap);color:var(--muted);font-size:20px;border-radius:99px}
 
 /* Equipos */
