@@ -381,6 +381,16 @@ begin
   end if;
 end $$;
 
+-- El organizador borra el grupo entero: plantel, partidos, votos y tabla.
+create or replace function delete_group(p_group uuid) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not is_group_admin(p_group) then
+    raise exception 'Solo el organizador puede eliminar el grupo';
+  end if;
+  delete from groups where id = p_group;
+end $$;
+
 grant execute on function is_member(uuid)                      to authenticated;
 grant execute on function is_group_admin(uuid)                 to authenticated;
 grant execute on function my_player_id(uuid)                   to authenticated;
@@ -392,6 +402,7 @@ grant execute on function update_my_profile(uuid, text)        to authenticated;
 grant execute on function reset_invite(uuid)                   to authenticated;
 grant execute on function set_member_role(uuid, uuid, text)    to authenticated;
 grant execute on function remove_player(uuid)                  to authenticated;
+grant execute on function delete_group(uuid)                   to authenticated;
 
 -- ---------- RLS ----------
 alter table admin_emails  enable row level security;

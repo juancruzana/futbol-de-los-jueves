@@ -276,6 +276,28 @@ r = await asLucho(`select remove_player($1)`, [id.FacuG2]);
 r = await asFacu(`select (select count(*)::int from group_members where user_id = $1) g, (select count(*)::int from players where id = $2) p`, [FACU, id.Facu]);
 check("eliminarlo de un grupo no lo saca de los otros", r.rows?.[0].g === 1 && r.rows[0].p === 1);
 
+// Eliminar un grupo
+r = await asLucho(`select create_group($1, $2) as id`, ["Para borrar", "Lucho"]);
+const G3 = r.rows?.[0].id;
+r = await asLucho(`select invite_code from groups where id = $1`, [G3]);
+await asFacu(`select join_group($1, $2)`, [r.rows?.[0].invite_code, "Facu"]);
+r = await asLucho(`insert into matches(group_id) values ($1) returning id`, [G3]);
+const mid3 = r.rows?.[0].id;
+r = await asLucho(`select id from players where group_id = $1 and user_id = $2`, [G3, FACU]);
+await asLucho(`insert into lineups(match_id,player_id,team) values ($1,$2,'A')`, [mid3, r.rows?.[0].id]);
+r = await asFacu(`select delete_group($1)`, [G3]);
+check("un jugador NO puede eliminar el grupo", !!r.error && /Solo el organizador/.test(r.error));
+r = await asAdmin(`select delete_group($1)`, [G3]);
+check("el organizador de otro grupo NO puede eliminarlo", !!r.error && /Solo el organizador/.test(r.error));
+r = await asLucho(`select delete_group($1)`, [G3]);
+check("el organizador elimina el grupo", !r.error);
+r = await db.query(`select (select count(*)::int from groups where id = $1) g, (select count(*)::int from group_members where group_id = $1) m,
+  (select count(*)::int from players where group_id = $1) p, (select count(*)::int from matches where group_id = $1) mt,
+  (select count(*)::int from lineups where group_id = $1) l`, [G3]);
+check("se borra todo lo del grupo", Object.values(r.rows[0]).every((c) => c === 0));
+r = await asFacu(`select count(*)::int c from group_members where user_id = $1`, [FACU]);
+check("los demás grupos de los miembros quedan como estaban", r.rows?.[0].c === 1);
+
 r = await asFacu(`select * from admin_emails`);
 check("la lista de organizadores de antes no es legible", !!r.error || r.rows.length === 0);
 

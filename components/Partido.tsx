@@ -8,6 +8,7 @@ import type { Format, Lineup, Match } from "@/lib/types";
 import { track } from "@/lib/analytics";
 import type { Ctx } from "./ctx";
 import { NewMatchButton } from "./Hero";
+import { useFresh } from "./fresh";
 
 /* ---------- Piezas chicas ---------- */
 const initials = (n: string) =>
@@ -120,9 +121,10 @@ function Poll({ ctx, m }: { ctx: Ctx; m: Match }) {
 
   const disabled = !voter;
   const voterName = voter ? pname(voter) : "";
+  const fresh = useFresh(`poll:${m.id}`);
 
   return (
-    <section className="card waq">
+    <section className={`card waq ${fresh ? "fresh" : ""}`}>
       <h2 style={{ marginBottom: 2 }}>{dayLabel(m.date)}</h2>
       <p className="small muted" style={{ margin: "0 0 12px" }}>
         ¿Jugás? · {m.format}, hacen falta {need}
@@ -308,7 +310,7 @@ function Organizer({ ctx, m }: { ctx: Ctx; m: Match }) {
           </div>
           {p.best && p.bySlot[p.best].length < need && (
             <p className="small" style={{ margin: "10px 0 0" }}>
-              Al mejor horario le faltan {need - p.bySlot[p.best].length} para {m.format}. Podés esperar más respuestas o cambiar el formato.
+              Al mejor horario le faltan {need - p.bySlot[p.best].length} para {m.format}.
             </p>
           )}
         </>

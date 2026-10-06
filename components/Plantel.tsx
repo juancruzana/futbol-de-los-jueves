@@ -107,7 +107,46 @@ function GroupName({ ctx }: { ctx: Ctx }) {
         </div>
         {err && <p className="err" id="group-name-err" role="alert">{err}</p>}
       </form>
+      <DeleteGroup ctx={ctx} />
     </section>
+  );
+}
+
+/** Borrar el grupo entero. Se confirma escribiendo el nombre: no se puede deshacer. */
+function DeleteGroup({ ctx }: { ctx: Ctx }) {
+  const { group, supabase, run } = ctx;
+  const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState("");
+  const [busy, setBusy] = useState(false);
+  const matches = typed.trim().toLowerCase() === group.name.toLowerCase();
+
+  async function del(e: React.FormEvent) {
+    e.preventDefault();
+    if (!matches) return;
+    setBusy(true);
+    await run(() => supabase.rpc("delete_group", { p_group: group.id }), `Se eliminó «${group.name}»`);
+    setBusy(false);
+  }
+
+  if (!open) {
+    return (
+      <div className="danger-zone" style={{ marginTop: 16 }}>
+        <button className="btn danger-ghost small" onClick={() => setOpen(true)}>Eliminar grupo</button>
+      </div>
+    );
+  }
+  return (
+    <form onSubmit={del} noValidate className="field" style={{ marginTop: 16 }}>
+      <label htmlFor="group-del">
+        Se borra todo el grupo para todos: plantel, partidos, votos y tabla. No se puede deshacer.
+        Escribí <b>{group.name}</b> para confirmar.
+      </label>
+      <input id="group-del" autoComplete="off" value={typed} onChange={(e) => setTyped(e.target.value)} />
+      <div className="confirm">
+        <button type="button" className="btn ghost" onClick={() => { setOpen(false); setTyped(""); }}>Cancelar</button>
+        <button className="btn danger" disabled={!matches || busy}>Eliminar grupo</button>
+      </div>
+    </form>
   );
 }
 

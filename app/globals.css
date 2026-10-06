@@ -232,6 +232,16 @@ tr.top .pos{color:var(--pitch)}
 
 /* Encuesta */
 .waq .opts{display:grid;gap:6px}
+/* Encuesta o votación recién abierta: la primera vez que se ve, el marco se enciende y late */
+@keyframes fresh-frame{0%,75%{border-color:var(--hot)}}
+@keyframes fresh-ring{
+  0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--hot) 50%,transparent)}
+  100%{box-shadow:0 0 0 12px transparent}
+}
+.card.fresh{animation:fresh-frame 4s ease-out}
+@media (prefers-reduced-motion:no-preference){
+  .card.fresh{animation:fresh-frame 4s ease-out,fresh-ring 1.3s ease-out 3}
+}
 .opt{display:flex;gap:12px;align-items:center;width:100%;min-height:60px;text-align:left;padding:10px 12px;border-radius:12px;border:1px solid var(--line)}
 .opt[aria-pressed="true"]{border-color:var(--win);background:color-mix(in srgb,var(--win) 8%,var(--surface))}
 .opt:not(:disabled):hover{background:var(--bg)}

@@ -5,6 +5,7 @@ import { fmtDate } from "@/lib/stats";
 import type { Match } from "@/lib/types";
 import { track } from "@/lib/analytics";
 import type { Ctx } from "./ctx";
+import { useFresh } from "./fresh";
 
 /** Votación de la figura de un partido jugado: votan los que jugaron y la cierra el organizador. */
 export default function FiguraVote({ ctx, m }: { ctx: Ctx; m: Match }) {
@@ -73,9 +74,10 @@ export default function FiguraVote({ ctx, m }: { ctx: Ctx; m: Match }) {
   }
 
   const cands = [...rows].sort((x, y) => x.team.localeCompare(y.team) || pname(x.player_id).localeCompare(pname(y.player_id)));
+  const fresh = useFresh(`fig:${m.id}`);
 
   return (
-    <section className="card waq">
+    <section className={`card waq ${fresh ? "fresh" : ""}`}>
       <div className="card-head">
         <h2>Figura del partido</h2>
         <span className="small muted num">{fmtDate(m.date)} · {m.score_a}–{m.score_b}</span>
