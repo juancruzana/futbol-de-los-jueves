@@ -5,6 +5,7 @@ import {
   FORMATS, balanceTeams, computeStats, dayLabel, hs, openMatch, pollSummary, sortSlots,
 } from "@/lib/stats";
 import type { Format, Lineup, Match } from "@/lib/types";
+import { track } from "@/lib/analytics";
 import type { Ctx } from "./ctx";
 import { NewMatchButton } from "./Hero";
 
@@ -91,6 +92,7 @@ function Poll({ ctx, m }: { ctx: Ctx; m: Match }) {
             })
           : supabase.from("availability").delete().eq("match_id", m.id).eq("player_id", id)
       );
+      if (ok) track("availability_voted", { going: next ? next.going : null, for_other: id !== meId });
       // Si falló, descarto lo que siguió tocando y vuelvo a lo que dice el servidor.
       if (!ok) queue.current.delete(id);
       if (!queue.current.has(id)) {
@@ -328,11 +330,12 @@ function Teams({ ctx, m }: { ctx: Ctx; m: Match }) {
       ...t.A.map((id) => ({ match_id: m.id, player_id: id, team: "A" as const, goals: prevGoals.get(id) ?? 0 })),
       ...t.B.map((id) => ({ match_id: m.id, player_id: id, team: "B" as const, goals: prevGoals.get(id) ?? 0 })),
     ];
-    await run(async () => {
+    const ok = await run(async () => {
       const del = await supabase.from("lineups").delete().eq("match_id", m.id);
       if (del.error) return del;
       return supabase.from("lineups").insert(next);
     }, "Equipos armados");
+    if (ok) track("teams_generated", { players: ids.length });
   }
   const swap = (id: string, team: "A" | "B") =>
     run(() => supabase.from("lineups").update({ team: team === "A" ? "B" : "A" }).eq("match_id", m.id).eq("player_id", id));
@@ -473,7 +476,10 @@ function ResultForm({ ctx, m }: { ctx: Ctx; m: Match }) {
       }).eq("id", m.id);
     }, "Resultado guardado");
     setBusy(false);
-    if (ok) setTab("tabla");
+    if (ok) {
+      track("result_saved");
+      setTab("tabla");
+    }
   }
 
   const line = (id: string) => (

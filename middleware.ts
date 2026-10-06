@@ -67,5 +67,6 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.svg).*)"],
+  // /ingest es el proxy de PostHog: no necesita sesión y no debe redirigir al login.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.svg|ingest/).*)"],
 };

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { FORMATS, dayLabel, fmtDate, hs, openMatch, playedMatches, pollSummary } from "@/lib/stats";
+import { track } from "@/lib/analytics";
 import type { Ctx } from "./ctx";
 
 export default function Hero({ ctx }: { ctx: Ctx }) {
@@ -95,7 +96,10 @@ export function NewMatchButton({ ctx, className = "" }: { ctx: Ctx; className?: 
       "Encuesta abierta"
     );
     setBusy(false);
-    if (ok) setTab("partido");
+    if (ok) {
+      track("match_created");
+      setTab("partido");
+    }
   }
   return (
     <button className={`btn ${className}`} id="new-match" disabled={busy} onClick={create}>

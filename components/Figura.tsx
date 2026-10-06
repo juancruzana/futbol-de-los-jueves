@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { fmtDate } from "@/lib/stats";
 import type { Match } from "@/lib/types";
+import { track } from "@/lib/analytics";
 import type { Ctx } from "./ctx";
 
 /** Votación de la figura de un partido jugado: votan los que jugaron y la cierra el organizador. */
@@ -25,13 +26,14 @@ export default function FiguraVote({ ctx, m }: { ctx: Ctx; m: Match }) {
     const next = pick === id ? null : id;
     setDraft(next);
     setBusy(true);
-    await run(() =>
+    const ok = await run(() =>
       next
         ? supabase.from("mvp_votes").upsert({
             match_id: m.id, voter_id: meId, player_id: next, updated_at: new Date().toISOString(),
           })
         : supabase.from("mvp_votes").delete().eq("match_id", m.id).eq("voter_id", meId)
     );
+    if (ok) track("mvp_voted", { removed: !next });
     setDraft(undefined);
     setBusy(false);
   }

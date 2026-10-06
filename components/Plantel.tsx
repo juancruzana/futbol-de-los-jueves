@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { track } from "@/lib/analytics";
 import type { Ctx } from "./ctx";
 
 /** Link de invitación: cualquiera del grupo lo comparte; el organizador puede cambiarlo. */
@@ -17,15 +18,20 @@ function Invite({ ctx }: { ctx: Ctx }) {
     try {
       await navigator.clipboard.writeText(link);
       toast("Link copiado");
+      track("invite_shared", { method: "copy" });
     } catch {
       toast("No se pudo copiar. Mantené apretado el link para copiarlo.");
     }
   }
   async function share() {
     if (navigator.share) {
-      try { await navigator.share({ title: group.name, text }); } catch {}
+      try {
+        await navigator.share({ title: group.name, text });
+        track("invite_shared", { method: "share" });
+      } catch {}
       return;
     }
+    track("invite_shared", { method: "whatsapp" });
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener");
   }
   async function reset() {

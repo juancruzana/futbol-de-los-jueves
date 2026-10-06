@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Data, Group } from "@/lib/types";
 import { openMatch, pendingMvpVote } from "@/lib/stats";
+import { identify, resetAnalytics, setContext, track } from "@/lib/analytics";
 import type { Ctx, Tab } from "./ctx";
 import Hero, { NewMatchButton } from "./Hero";
 import Tabla from "./Tabla";
@@ -99,6 +100,19 @@ export default function App({
     clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setMsg(""), 2400);
   }, []);
+
+  // "Abrió la app": al cargar, y al volver después de un rato (en el celu la pestaña queda abierta días).
+  useEffect(() => {
+    identify(userId);
+    track("app_opened");
+    let hiddenAt = 0;
+    const onVisibility = () => {
+      if (document.hidden) hiddenAt = Date.now();
+      else if (hiddenAt && Date.now() - hiddenAt > 30 * 60_000) track("app_opened");
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [userId]);
 
   useEffect(() => {
     try {
@@ -280,6 +294,15 @@ export default function App({
   const needsMvpVote = !!me && pendingMvpVote(data, me.id);
   const name = me?.name ?? displayName;
 
+  // Todas las pestañas viven en "/": PostHog no las distingue solo, hay que avisarle.
+  const tabsOn = !!showTabs;
+  useEffect(() => {
+    if (group) setContext({ group_id: group.id, group_name: group.name, is_admin: isAdmin });
+  }, [group?.id, group?.name, isAdmin]);
+  useEffect(() => {
+    if (tabsOn) track("tab_viewed", { tab });
+  }, [tab, tabsOn, groupId]);
+
   // Acción principal al alcance del pulgar. En "Partido" no hace falta: la acción ya está en pantalla.
   let fab: React.ReactNode = null;
   if (showTabs && ctx && tab !== "partido") {
@@ -382,7 +405,7 @@ export default function App({
                   </button>
                 </>
               )}
-              <form action="/auth/signout" method="post">
+              <form action="/auth/signout" method="post" onSubmit={resetAnalytics}>
                 <button className="menu-item danger" type="submit" role="menuitem">Cerrar sesión</button>
               </form>
             </div>

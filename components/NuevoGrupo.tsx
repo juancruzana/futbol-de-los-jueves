@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { track } from "@/lib/analytics";
 
 const clean = (v: string) => v.trim().replace(/\s+/g, " ");
 
@@ -36,6 +37,7 @@ export default function NuevoGrupo({
     const { data, error } = await supabase.rpc("create_group", { p_name: g, p_player_name: n });
     setBusy(false);
     if (error) { setErr({ form: error.message || "No se pudo crear el grupo. Probá de nuevo." }); return; }
+    track("group_created", { first });
     onCreated(data as string);
   }
 

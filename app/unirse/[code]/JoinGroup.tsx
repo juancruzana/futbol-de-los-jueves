@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { track } from "@/lib/analytics";
 
 export default function JoinGroup({
   code,
@@ -30,6 +31,7 @@ export default function JoinGroup({
       setErr(error.message || "No se pudo entrar al grupo. Probá de nuevo.");
       return;
     }
+    track("group_joined");
     router.replace(`/?g=${data as string}`);
   }
 
