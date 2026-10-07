@@ -1,6 +1,6 @@
 "use client";
 
-import { PTS, computeStats, openMatch, type PlayerStats, type Result } from "@/lib/stats";
+import { PTS, computeStats, type PlayerStats, type Result } from "@/lib/stats";
 import type { Ctx } from "./ctx";
 
 const LETTER: Record<Result, string> = { W: "G", D: "E", L: "P" };
@@ -46,26 +46,22 @@ function Scoring() {
 }
 
 export default function Tabla({ ctx }: { ctx: Ctx }) {
-  const { data, isAdmin, meId, setTab } = ctx;
-  const open = openMatch(data.matches);
+  const { data, isAdmin, meId } = ctx;
   const { list, total } = computeStats(data);
   const rows = list
     .filter((s) => s.active || s.pj)
     .sort((a, b) => b.pts - a.pts || b.pj - a.pj || b.goles - a.goles || a.name.localeCompare(b.name));
 
-  if (!total) {
+  if (!rows.length) {
     return (
       <>
         <div className="card empty">
-          <h2>Todavía no hay partidos cargados</h2>
+          <h2>Todavía no hay nadie en el plantel</h2>
           <p className="muted">
             {isAdmin
-              ? "Abrí la encuesta, que cada uno vote su horario, armá los equipos y cargá el resultado. La tabla y las rachas se calculan solas."
-              : "Cuando se juegue el primer partido, acá vas a ver la tabla, las rachas y los goleadores."}
+              ? "Compartí el link de invitación para que se sumen los jugadores."
+              : "Cuando haya jugadores en el plantel, acá vas a ver la tabla."}
           </p>
-          {open && (
-            <button className="btn ghost" onClick={() => setTab("partido")}>Ver el próximo partido</button>
-          )}
         </div>
         <Scoring />
       </>
