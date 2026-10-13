@@ -47,7 +47,7 @@ function LoginInner() {
       <div className="box">
         <header className="pitch">
           <div className="eyebrow">{invited ? "Te invitaron a un grupo" : "El fútbol de tu grupo"}</div>
-          <h1>Fútbol de los Jueves</h1>
+          <h1>FutbolApp</h1>
           <p style={{ margin: "10px 0 0", opacity: 0.9 }}>
             {invited
               ? "Entrá con Google y elegí tu nombre para sumarte."

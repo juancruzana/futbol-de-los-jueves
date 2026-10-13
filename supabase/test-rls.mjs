@@ -343,8 +343,8 @@ await old.exec(schema);
 await old.exec(`grant all on all tables in schema public to authenticated;`);
 const o = client(old);
 r = await o.asAdmin(`select g.name, m.role from groups g join group_members m on m.group_id = g.id where m.user_id = $1`, [ADMIN]);
-check("los datos de antes quedan en el grupo «Fútbol de los Jueves» con el organizador de siempre",
-  r.rows?.length === 1 && r.rows[0].name === "Fútbol de los Jueves" && r.rows[0].role === "admin");
+check("los datos de antes quedan en el grupo «FutbolApp» con el organizador de siempre",
+  r.rows?.length === 1 && r.rows[0].name === "FutbolApp" && r.rows[0].role === "admin");
 r = await o.asFacu(`select (select count(*)::int from players) p, (select count(*)::int from matches) m,
   (select count(*)::int from lineups) l, (select count(*)::int from availability) a`);
 check("los jugadores de antes siguen viendo plantel, partidos, equipos y votos",

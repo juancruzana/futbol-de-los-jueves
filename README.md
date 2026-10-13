@@ -1,4 +1,4 @@
-# Fútbol de los Jueves
+# FutbolApp
 
 App web para el grupo de fútbol. Incluye encuesta de horario estilo WhatsApp, equipos parejos, resultados, tabla de puntos y rachas. Cada amigo entra con su propia cuenta.
 
@@ -15,6 +15,6 @@ Cada **grupo** es su propio fútbol: plantel, partidos, encuesta, tabla e histor
 
 La seguridad está en la base de datos (Row Level Security), no en el frontend. Nadie ve ni toca nada de un grupo del que no es parte. Un jugador solo puede escribir su propio voto y solo mientras el partido está abierto. Todo lo demás lo escribe el organizador de ese grupo. Las pruebas de RLS cubren también el aislamiento entre grupos y la migración de una base vieja de un solo grupo (66 casos). Para correrlas: `npm run test:rls`.
 
-**Migración:** si la base es de antes de los grupos, correr `supabase/schema.sql` mete todo lo que había en un grupo "Fútbol de los Jueves". Los mails de `admin_emails` quedan como organizadores y los jugadores con cuenta, como jugadores.
+**Migración:** si la base es de antes de los grupos, correr `supabase/schema.sql` mete todo lo que había en un grupo "FutbolApp". Los mails de `admin_emails` quedan como organizadores y los jugadores con cuenta, como jugadores.
 
 **Puntos:** +1 por jugar, +3 por victoria, +1 por empate, +1 por gol y +2 por figura (en `lib/stats.ts`).

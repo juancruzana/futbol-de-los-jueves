@@ -1,5 +1,5 @@
 -- =============================================================
--- Fútbol de los Jueves — esquema + seguridad (RLS)
+-- FutbolApp — esquema + seguridad (RLS)
 -- Pegalo entero en Supabase → SQL Editor → Run.
 -- Se puede volver a correr: todo es idempotente.
 -- =============================================================
@@ -83,7 +83,7 @@ create table if not exists lineups (
 
 -- ---------- Migración: de un solo grupo a varios ----------
 -- Bases creadas antes de los grupos: agrega las columnas y mete todo lo que
--- había en un grupo "Fútbol de los Jueves".
+-- había en un grupo "FutbolApp".
 alter table players      add column if not exists group_id uuid references groups(id) on delete cascade;
 alter table matches      add column if not exists group_id uuid references groups(id) on delete cascade;
 alter table availability add column if not exists group_id uuid references groups(id) on delete cascade;
@@ -99,7 +99,7 @@ begin
     select u.id into v_owner
       from auth.users u join admin_emails a on lower(a.email) = lower(u.email)
       limit 1;
-    insert into groups (name, created_by) values ('Fútbol de los Jueves', v_owner) returning id into g;
+    insert into groups (name, created_by) values ('FutbolApp', v_owner) returning id into g;
     update players set group_id = g where group_id is null;
     update matches set group_id = g where group_id is null;
     insert into group_members (group_id, user_id, role)

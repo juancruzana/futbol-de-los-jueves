@@ -337,7 +337,7 @@ export default function App({
               onClick={() => setGroupMenuOpen((o) => !o)}
             >
               {logo}
-              <span>{group?.name ?? "Fútbol de los Jueves"}</span>
+              <span>{group?.name ?? "FutbolApp"}</span>
               <svg className="chev" {...ICON_PROPS} width="18" height="18"><path d="M6 9l6 6 6-6" /></svg>
             </button>
             {groupMenuOpen && (
@@ -368,7 +368,7 @@ export default function App({
             )}
           </div>
         ) : (
-          <div className="brand">{logo}<span>Fútbol de los Jueves</span></div>
+          <div className="brand">{logo}<span>FutbolApp</span></div>
         )}
         <div className="acct" ref={menuRef}>
           <button

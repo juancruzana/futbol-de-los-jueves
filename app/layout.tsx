@@ -10,7 +10,7 @@ import "./globals.css";
 
 
 export const metadata: Metadata = {
-  title: "Fútbol de los Jueves",
+  title: "FutbolApp",
   description: "Convocatoria, horarios, equipos, resultados y tabla del grupo.",
 };
 
