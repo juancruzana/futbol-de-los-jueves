@@ -10,7 +10,7 @@ export type AnalyticsEvent =
   | "match_created"       // { format, slots }: abrió una encuesta (convocatoria) con el asistente
   | "match_edited"        // { date, slots, format }: qué cambió de la encuesta abierta
   | "poll_closed"         // { edited }: cerró la encuesta confirmando el horario (edited = ajustó día o formato al cerrar)
-  | "availability_voted"  // { going, for_other }: votó si juega (going null = borró el voto)
+  | "availability_voted"  // { going, for_other, changed }: confirmó su voto (going null = lo borró; changed = ya tenía uno)
   | "teams_generated"     // { players }: armó los equipos
   | "result_saved"        // cargó el resultado
   | "mvp_voted"           // { removed }: votó la figura

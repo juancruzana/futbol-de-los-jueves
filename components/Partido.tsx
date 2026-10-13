@@ -1,126 +1,98 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   FORMATS, balanceTeams, computeStats, dayLabel, hs, openMatch, pollSummary, sortSlots,
 } from "@/lib/stats";
 import type { Format, Lineup, Match } from "@/lib/types";
 import { track } from "@/lib/analytics";
 import type { Ctx } from "./ctx";
-import Convocatoria, { Summary } from "./Convocatoria";
+import Convocatoria, { Summary, slotsLabel } from "./Convocatoria";
 import { useFresh } from "./fresh";
 
-/* ---------- Piezas chicas ---------- */
-const initials = (n: string) =>
-  n.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "?";
-const hue = (id: string) => {
-  let h = 0;
-  for (const c of id) h = (h * 31 + c.charCodeAt(0)) % 360;
-  return h;
-};
+/* ---------- Encuesta personal: se elige, se confirma y después se mira cómo va ---------- */
+type Vote = { going: boolean; hours: string[] } | null;
 
-function Faces({ ids, pname }: { ids: string[]; pname: Ctx["pname"] }) {
-  if (!ids.length) return null;
-  return (
-    <span className="faces">
-      {ids.slice(0, 3).map((id) => (
-        <span key={id} className="face" style={{ "--h": hue(id) } as React.CSSProperties} title={pname(id)}>
-          {initials(pname(id))}
-        </span>
-      ))}
-    </span>
-  );
-}
+const sameVote = (a: Vote, b: Vote) =>
+  a === b || (!!a && !!b && a.going === b.going && a.hours.join() === b.hours.join());
 
 function Option(props: {
-  id: string; label: string; ids: string[]; max: number; on: boolean; kind: "radio" | "check";
-  disabled?: boolean; onClick: () => void; pname: Ctx["pname"];
+  id: string; on: boolean; kind: "radio" | "check"; disabled?: boolean; onClick: () => void; children: React.ReactNode;
 }) {
-  const { id, label, ids, max, on, kind, disabled, onClick, pname } = props;
+  const { id, on, kind, disabled, onClick, children } = props;
   return (
     <button className="opt" id={id} disabled={disabled} aria-pressed={on} onClick={onClick}>
       <span className={`mark ${kind} ${on ? "on" : ""}`} aria-hidden="true">{on ? "✓" : ""}</span>
-      <span className="ob">
-        <span className="ot">
-          <span className="ol">{label}</span>
-          <span className="row" style={{ gap: 6 }}>
-            <Faces ids={ids} pname={pname} />
-            <span className="oc num">{ids.length}</span>
-          </span>
-        </span>
-        <span className="obar"><i style={{ width: `${(ids.length / max) * 100}%` }} /></span>
-      </span>
+      {children}
     </button>
   );
 }
 
-/* ---------- Encuesta personal ---------- */
-type Vote = { going: boolean; hours: string[] } | null;
+/** Una hora de la encuesta: cuántos confirmaron que pueden contra los que hacen falta, y cuál destaca.
+ *  Se ve igual al elegir los horarios y en "Cómo va". */
+function SlotDemand({ m, p, s }: { m: Match; p: ReturnType<typeof pollSummary>; s: string }) {
+  const need = FORMATS[m.format] ?? 22;
+  const n = p.bySlot[s].length;
+  const top = Math.max(...p.slots.map((x) => p.bySlot[x].length));
+  const tag = m.time === s ? "Confirmado" : !m.time && n > 0 && n === top ? "Más votado" : "";
+  return (
+    <span className="ob">
+      <span className="ot">
+        <span className="ol slot-l">{hs(s)}{tag && <span className="badge">{tag}</span>}</span>
+        <span className="oc num">{n}<span className="muted">/{need}</span>{n >= need && " ✓"}</span>
+      </span>
+      <span className="obar"><i style={{ width: `${Math.min(100, (n / need) * 100)}%` }} /></span>
+    </span>
+  );
+}
 
 function Poll({ ctx, m }: { ctx: Ctx; m: Match }) {
   const { data, supabase, run, isAdmin, meId, pname } = ctx;
-  // Votos tocados que el servidor todavía no confirmó: se muestran al instante, sin esperar la vuelta.
-  const [drafts, setDrafts] = useState<Map<string, Vote>>(() => new Map());
-  const view = useMemo(() => {
-    if (!drafts.size) return data;
-    const rest = data.availability.filter((a) => a.match_id !== m.id || !drafts.has(a.player_id));
-    const local = [...drafts].flatMap(([player_id, v]) => (v ? [{ match_id: m.id, player_id, ...v }] : []));
-    return { ...data, availability: [...rest, ...local] };
-  }, [data, drafts, m.id]);
-  const p = pollSummary(m, view);
+  const p = pollSummary(m, data);
   const need = FORMATS[m.format] ?? 22;
   const [voterSel, setVoterSel] = useState<string>("");
   const voter = isAdmin && voterSel ? voterSel : meId;
-  const mine = voter ? p.votes.get(voter) : undefined;
+  const forMe = voter === meId;
 
-  const maxA = Math.max(1, p.toy.length, p.notoy.length);
-  const maxH = Math.max(1, ...p.slots.map((s) => p.bySlot[s].length));
+  // Sin los horarios que el organizador sacó de la encuesta: esos ya no cuentan.
+  const clean = (v: Vote): Vote => v && { going: v.going, hours: v.going ? v.hours.filter((s) => p.slots.includes(s)) : [] };
+  const row = voter ? p.votes.get(voter) : undefined;
+  const saved = clean(row ? { going: row.going, hours: row.hours } : null);
+  // Lo que se va tocando no se guarda hasta confirmar (undefined = no se está cambiando nada).
+  const [draft, setDraft] = useState<Vote | undefined>(undefined);
+  const [busy, setBusy] = useState(false);
+  const editing = draft !== undefined || !saved;
+  const sel = draft === undefined ? saved : clean(draft);
+  const valid = !!sel && (!sel.going || sel.hours.length > 0);
 
-  // Una escritura por vez y solo la última de cada jugador: si toca rápido, no se pisan en el servidor.
-  const queue = useRef(new Map<string, Vote>());
-  const flushing = useRef(false);
-  async function flush() {
-    if (flushing.current) return;
-    flushing.current = true;
-    while (queue.current.size) {
-      const [id, next] = [...queue.current][0];
-      queue.current.delete(id);
-      const ok = await run(() =>
-        next
-          ? supabase.from("availability").upsert({
-              match_id: m.id, player_id: id, going: next.going, hours: next.hours,
-              updated_at: new Date().toISOString(),
-            })
-          : supabase.from("availability").delete().eq("match_id", m.id).eq("player_id", id)
-      );
-      if (ok) track("availability_voted", { going: next ? next.going : null, for_other: id !== meId });
-      // Si falló, descarto lo que siguió tocando y vuelvo a lo que dice el servidor.
-      if (!ok) queue.current.delete(id);
-      if (!queue.current.has(id)) {
-        setDrafts((d) => {
-          const n = new Map(d);
-          n.delete(id);
-          return n;
-        });
-      }
-    }
-    flushing.current = false;
-  }
-  function save(next: Vote) {
-    if (!voter) return;
-    setDrafts((d) => new Map(d).set(voter, next));
-    queue.current.set(voter, next);
-    flush();
-  }
-  const toy = () => save(mine?.going ? null : { going: true, hours: mine?.hours ?? [] });
-  const notoy = () => save(mine && !mine.going ? null : { going: false, hours: [] });
+  const toy = () => setDraft(sel?.going ? null : { going: true, hours: sel?.hours ?? [] });
+  const notoy = () => setDraft(sel && !sel.going ? null : { going: false, hours: [] });
   const hour = (s: string) => {
-    const cur = mine?.going ? mine.hours : [];
-    save({ going: true, hours: cur.includes(s) ? cur.filter((x) => x !== s) : sortSlots([...cur, s]) });
+    const cur = sel?.going ? sel.hours : [];
+    setDraft({ going: true, hours: cur.includes(s) ? cur.filter((x) => x !== s) : sortSlots([...cur, s]) });
   };
 
-  const disabled = !voter;
-  const voterName = voter ? pname(voter) : "";
+  async function confirm() {
+    if (!voter) return;
+    if (sameVote(sel, saved)) { setDraft(undefined); return; }
+    setBusy(true);
+    const de = forMe ? "" : ` de ${pname(voter)}`;
+    const ok = await run(
+      () => sel
+        ? supabase.from("availability").upsert({
+            match_id: m.id, player_id: voter, going: sel.going, hours: sel.hours,
+            updated_at: new Date().toISOString(),
+          })
+        : supabase.from("availability").delete().eq("match_id", m.id).eq("player_id", voter),
+      sel ? `Voto${de} confirmado` : `Voto${de} borrado`
+    );
+    setBusy(false);
+    if (!ok) return;
+    track("availability_voted", { going: sel ? sel.going : null, for_other: !forMe, changed: !!saved });
+    setDraft(undefined);
+  }
+
+  const disabled = !voter || busy;
   const fresh = useFresh(`poll:${m.id}`);
 
   return (
@@ -134,7 +106,7 @@ function Poll({ ctx, m }: { ctx: Ctx; m: Match }) {
       {isAdmin ? (
         <div className="field" style={{ marginBottom: 12 }}>
           <label htmlFor="voter">Votando como</label>
-          <select id="voter" value={voterSel} onChange={(e) => setVoterSel(e.target.value)}>
+          <select id="voter" value={voterSel} disabled={busy} onChange={(e) => { setVoterSel(e.target.value); setDraft(undefined); }}>
             <option value="">{meId ? `Yo (${pname(meId)})` : "Elegí un jugador"}</option>
             {p.active
               .filter((x) => x.id !== meId)
@@ -144,54 +116,152 @@ function Poll({ ctx, m }: { ctx: Ctx; m: Match }) {
               ))}
           </select>
         </div>
-      ) : (
+      ) : editing && (
         <p className="small muted" style={{ margin: "0 0 10px" }}>
-          Votando como <b style={{ color: "var(--ink)" }}>{voterName}</b>
+          Votando como <b style={{ color: "var(--ink)" }}>{pname(voter)}</b>
         </p>
       )}
 
-      <div className="opts">
-        <Option id="opt-toy" label="Toy" ids={p.toy} max={maxA} on={!!mine?.going} kind="radio" disabled={disabled} onClick={toy} pname={pname} />
-        <Option id="opt-notoy" label="No toy" ids={p.notoy} max={maxA} on={!!mine && !mine.going} kind="radio" disabled={disabled} onClick={notoy} pname={pname} />
-      </div>
-
-      {mine?.going ? (
-        <div className="hours">
-          <p style={{ margin: "0 0 2px" }}><b>¿A qué hora podés?</b></p>
-          <p className="small muted" style={{ margin: "0 0 8px" }}>Elegí uno o más</p>
-          <div className="opts">
-            {p.slots.map((s) => (
-              <Option
-                key={s} id={`opt-${s.replace(":", "")}`} label={hs(s)} ids={p.bySlot[s]} max={maxH}
-                on={mine.hours.includes(s)} kind="check" disabled={disabled} onClick={() => hour(s)} pname={pname}
-              />
+      {!editing && saved ? (
+        <div className="myvote">
+          <span className="mark radio on" aria-hidden="true">✓</span>
+          <span className="mv">
+            <span className="k">{forMe ? "Tu voto" : `Voto de ${pname(voter)}`}</span>
+            <span className="ol">{saved.going ? "Toy" : "No toy"}</span>
+            {saved.going && (saved.hours.length ? (
+              <span className="small">{slotsLabel(saved.hours)}</span>
+            ) : (
+              <span className="small" style={{ color: "var(--hot)" }}>Sin horario, así no cuenta: tocá Cambiar y marcá alguno.</span>
             ))}
-          </div>
-          {!mine.hours.length && (
-            <p className="small" style={{ margin: "8px 0 0", color: "var(--hot)" }}>
-              Marcá al menos un horario para que cuente.
-            </p>
-          )}
+          </span>
+          <button className="btn ghost" onClick={() => setDraft(saved)}>Cambiar</button>
         </div>
       ) : (
-        <div className="hours">
-          <p className="small muted" style={{ margin: 0 }}>
-            Horarios:{" "}
-            {p.slots.map((s, i) => (
-              <span key={s}>{i > 0 && " · "}<b style={{ color: "var(--ink)" }}>{hs(s)}</b> ({p.bySlot[s].length})</span>
-            ))}
-          </p>
-        </div>
+        <>
+          <div className="opts">
+            <Option id="opt-toy" on={!!sel?.going} kind="radio" disabled={disabled} onClick={toy}>
+              <span className="ol">Toy</span>
+            </Option>
+            <Option id="opt-notoy" on={!!sel && !sel.going} kind="radio" disabled={disabled} onClick={notoy}>
+              <span className="ol">No toy</span>
+            </Option>
+          </div>
+          {sel?.going && (
+            <div className="hours">
+              <p style={{ margin: "0 0 2px" }}><b>¿A qué hora podés?</b></p>
+              <p className="small muted" style={{ margin: "0 0 8px" }}>Elegí uno o más. Al lado, cuántos ya confirmaron cada hora.</p>
+              <div className="opts">
+                {p.slots.map((s) => (
+                  <Option
+                    key={s} id={`opt-${s.replace(":", "")}`} on={sel.hours.includes(s)} kind="check"
+                    disabled={disabled} onClick={() => hour(s)}
+                  >
+                    <SlotDemand m={m} p={p} s={s} />
+                  </Option>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* Hasta acá nada se guardó: recién cuenta al confirmar. Sin elegir nada, "Borrar voto" saca el que había. */}
+          <div className="sticky-cta">
+            {sel?.going && !sel.hours.length && <p className="hint">Marcá al menos un horario para confirmar.</p>}
+            {saved ? (
+              <div className="confirm">
+                <button className="btn ghost" disabled={busy} onClick={() => setDraft(undefined)}>Cancelar</button>
+                {sel ? (
+                  <button className="btn" id="confirm-vote" disabled={busy || !valid} onClick={confirm}>
+                    {busy ? "Guardando…" : "Confirmar voto"}
+                  </button>
+                ) : (
+                  <button className="btn danger" disabled={busy} onClick={confirm}>{busy ? "Borrando…" : "Borrar voto"}</button>
+                )}
+              </div>
+            ) : (
+              <button className="btn" id="confirm-vote" disabled={disabled || !valid} onClick={confirm}>
+                {busy ? "Guardando…" : "Confirmar voto"}
+              </button>
+            )}
+          </div>
+        </>
       )}
+    </section>
+  );
+}
 
-      <details className="voters">
-        <summary className="small">Ver quién votó · {p.toy.length + p.notoy.length} de {p.active.length}</summary>
+/* ---------- Cómo va: la encuesta en vivo ---------- */
+/** Ids cuyo valor cambió mientras se mira (lo que ya estaba al abrir no cuenta), con cuándo cambió, para resaltarlos un rato. */
+function useJustChanged(sigs: Map<string, string>, ms = 4000) {
+  const key = [...sigs].map(([id, s]) => `${id}=${s}`).sort().join("|");
+  const prev = useRef<Map<string, string> | null>(null);
+  const [hot, setHot] = useState<Map<string, number>>(() => new Map());
+  useEffect(() => {
+    const before = prev.current;
+    prev.current = sigs;
+    if (!before) return;
+    const at = Date.now();
+    const changed = [...new Set([...before.keys(), ...sigs.keys()])].filter((id) => before.get(id) !== sigs.get(id));
+    if (changed.length) setHot((h) => new Map([...h, ...changed.map((id) => [id, at] as const)]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  useEffect(() => {
+    if (!hot.size) return;
+    const wait = Math.min(...hot.values()) + ms - Date.now();
+    const t = setTimeout(() => setHot((h) => new Map([...h].filter(([, at]) => Date.now() - at < ms))), Math.max(0, wait) + 50);
+    return () => clearTimeout(t);
+  }, [hot, ms]);
+  return hot;
+}
+
+function Board({ ctx, m }: { ctx: Ctx; m: Match }) {
+  const { data, meId, pname, live } = ctx;
+  const p = pollSummary(m, data);
+  // Dijeron que juegan pero no tienen ningún horario que siga en la encuesta: no suman en ninguno.
+  const loose = p.toy.filter((id) => !p.slots.some((s) => p.bySlot[s].includes(id)));
+  const hot = useJustChanged(new Map([...p.votes].map(([id, v]) => [id, v.going ? `toy ${v.hours.join()}` : "notoy"])));
+
+  const names = (ids: string[], off = false) => ids.length > 0 && (
+    <div className={`names ${off ? "off" : ""}`}>
+      {ids.map((id) => {
+        const at = hot.get(id);
+        // La key cambia con cada cambio: el nombre se vuelve a montar y la animación arranca de nuevo.
+        return (
+          <span key={`${id}:${at ?? ""}`} className={`${id === meId ? "me" : ""} ${at ? "new" : ""}`}>
+            {pname(id)}{id === meId && " (vos)"}
+          </span>
+        );
+      })}
+    </div>
+  );
+  const rowOf = (label: string, ids: string[], off = false) => (
+    <div className="trow">
+      <div className="ot">
+        <span className={`ol ${off ? "muted" : ""}`}>{label}</span>
+        <span className={`oc num ${off ? "muted" : ""}`}>{ids.length}</span>
+      </div>
+      {names(ids, off)}
+    </div>
+  );
+
+  return (
+    <section className="card">
+      <div className="card-head">
+        <h2>Cómo va</h2>
+        <span className={`live ${live ? "" : "off"}`} role="status">{live ? "En vivo" : "Conectando…"}</span>
+      </div>
+      <p className="small muted" style={{ margin: 0 }}>
+        Respondieron <b className="num" style={{ color: "var(--ink)" }}>{p.toy.length + p.notoy.length}</b> de {p.active.length}
+      </p>
+      <div className="tally">
         {p.slots.map((s) => (
-          <p key={s} className="small"><b>{hs(s)}:</b> {p.bySlot[s].map(pname).join(", ") || "—"}</p>
+          <div key={s} className={`trow ${m.time === s ? "pick" : ""}`}>
+            <SlotDemand m={m} p={p} s={s} />
+            {names(p.bySlot[s])}
+          </div>
         ))}
-        <p className="small"><b>No toy:</b> {p.notoy.map(pname).join(", ") || "—"}</p>
-        <p className="small muted"><b>Sin responder:</b> {p.pending.map(pname).join(", ") || "nadie"}</p>
-      </details>
+        {loose.length > 0 && rowOf("Toy, sin horario", loose)}
+        {rowOf("No toy", p.notoy)}
+        {rowOf("Sin responder", p.pending, true)}
+      </div>
     </section>
   );
 }
@@ -541,7 +611,7 @@ function ResultForm({ ctx, m }: { ctx: Ctx; m: Match }) {
 
 /* ---------- Página ---------- */
 export default function Partido({ ctx }: { ctx: Ctx }) {
-  const { data, isAdmin, supabase, run } = ctx;
+  const { data, isAdmin, meId, supabase, run } = ctx;
   const m = openMatch(data.matches);
   const [confirmDel, setConfirmDel] = useState(false);
 
@@ -564,6 +634,8 @@ export default function Partido({ ctx }: { ctx: Ctx }) {
   }
 
   const hasTeams = data.lineups.some((l) => l.match_id === m.id);
+  // "Cómo va" aparece recién después de votar. Un organizador sin jugador no tiene cómo votar (lo ve siempre)
+  const voted = !meId || data.availability.some((a) => a.match_id === m.id && a.player_id === meId);
 
   // Partido ya jugado que se reabrió desde Historial: solo equipos y resultado.
   if (m.played_at) {
@@ -578,6 +650,7 @@ export default function Partido({ ctx }: { ctx: Ctx }) {
   return (
     <>
       <Poll ctx={ctx} m={m} key={`poll-${m.id}`} />
+      {voted && <Board ctx={ctx} m={m} key={`board-${m.id}`} />}
       {isAdmin && <Organizer ctx={ctx} m={m} />}
       {m.time && <Teams ctx={ctx} m={m} />}
       {m.time && hasTeams && isAdmin && <ResultForm ctx={ctx} m={m} key={`res-${m.id}`} />}

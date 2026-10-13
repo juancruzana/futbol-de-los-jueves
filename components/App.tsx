@@ -86,6 +86,7 @@ export default function App({
   const [loadError, setLoadError] = useState("");
   const [tab, setTabState] = useState<Tab>("tabla");
   const [msg, setMsg] = useState("");
+  const [live, setLive] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [groupMenuOpen, setGroupMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -209,13 +210,23 @@ export default function App({
     ["groups", "group_members", "players", "matches", "availability", "lineups", "mvp_votes"].forEach((table) =>
       ch.on("postgres_changes", { event: "*", schema: "public", table }, bump)
     );
-    ch.subscribe();
-    const onFocus = () => load();
-    window.addEventListener("focus", onFocus);
+    // Si la conexión se cortó y volvió, lo que cambió mientras tanto no llegó: recargo.
+    let joined = false;
+    ch.subscribe((status) => {
+      const ok = status === "SUBSCRIBED";
+      if (ok && joined) bump();
+      if (ok) joined = true;
+      setLive(ok);
+    });
+    // En el celu la pestaña se duerme y no siempre recibe "focus" al volver.
+    const onVisible = () => { if (!document.hidden) bump(); };
+    window.addEventListener("focus", bump);
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       clearTimeout(t);
       supabase.removeChannel(ch);
-      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("focus", bump);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [supabase, load]);
 
@@ -247,7 +258,7 @@ export default function App({
   const suggestedName = me?.name ?? (displayName.includes("@") ? "" : displayName.split(" ")[0]);
 
   const ctx: Ctx | null = group
-    ? { data, supabase, group, isAdmin, userId, meId: me?.id ?? null, setTab, run, toast, pname }
+    ? { data, supabase, group, isAdmin, userId, meId: me?.id ?? null, live, setTab, run, toast, pname }
     : null;
 
   let body: React.ReactNode;

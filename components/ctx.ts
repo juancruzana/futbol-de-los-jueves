@@ -14,6 +14,8 @@ export type Ctx = {
   userId: string;
   /** jugador de la cuenta logueada en este grupo */
   meId: string | null;
+  /** conectado al tiempo real: los cambios de los demás llegan solos */
+  live: boolean;
   setTab: (t: Tab) => void;
   /** corre una escritura, muestra error o mensaje, y refresca los datos */
   run: (fn: () => PromiseLike<{ error: { message: string } | null }>, ok?: string) => Promise<boolean>;

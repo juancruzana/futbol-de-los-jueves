@@ -25,7 +25,7 @@ const addDays = (iso: string, n: number) => {
 };
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 /** "20 · 21 · 22 hs" */
-const slotsLabel = (slots: string[]) => `${slots.map((s) => hs(s).slice(0, -3)).join(" · ")} hs`;
+export const slotsLabel = (slots: string[]) => `${slots.map((s) => hs(s).slice(0, -3)).join(" · ")} hs`;
 
 /** Lo de siempre: el mismo día de la semana, los horarios y el formato del último partido jugado. */
 function usual(matches: Match[]): Draft {

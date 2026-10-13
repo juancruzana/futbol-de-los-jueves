@@ -11,7 +11,7 @@ Cada **grupo** es su propio fútbol: plantel, partidos, encuesta, tabla e histor
 | Quién | Qué puede hacer |
 |---|---|
 | **Organizador** (por grupo) | Abrir la encuesta en pasos (día → horarios → formato → confirmar), editarla mientras está abierta, cerrarla eligiendo la hora (con un último ajuste de día y formato), armar equipos, cargar resultados, corregir o borrar partidos, votar por alguien que contestó por WhatsApp, dar de baja jugadores, nombrar a otros organizadores, cambiarle el nombre al grupo y cambiar el link de invitación. |
-| **Jugador** | Entra con el link de invitación del grupo (`/unirse/<código>`), inicia sesión con Google y elige su nombre o apodo para ese grupo (lo puede cambiar después en *Mi perfil*). Después vota "Toy / No toy" y sus horarios, y ve la tabla, las rachas y el historial. También puede compartir el link de invitación. |
+| **Jugador** | Entra con el link de invitación del grupo (`/unirse/<código>`), inicia sesión con Google y elige su nombre o apodo para ese grupo (lo puede cambiar después en *Mi perfil*). Después vota "Toy / No toy" y sus horarios, lo confirma y sigue en vivo cómo va la encuesta. También ve la tabla, las rachas y el historial, y puede compartir el link de invitación. |
 
 La seguridad está en la base de datos (Row Level Security), no en el frontend. Nadie ve ni toca nada de un grupo del que no es parte. Un jugador solo puede escribir su propio voto y solo mientras el partido está abierto. Todo lo demás lo escribe el organizador de ese grupo. Las pruebas de RLS cubren también el aislamiento entre grupos y la migración de una base vieja de un solo grupo (66 casos). Para correrlas: `npm run test:rls`.
 

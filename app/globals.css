@@ -255,16 +255,35 @@ tr.top .pos{color:var(--pitch)}
 .oc{font-weight:700;min-width:18px;text-align:right}
 .obar{height:7px;border-radius:99px;background:var(--line);overflow:hidden}
 .obar i{display:block;height:100%;background:var(--win);border-radius:99px}
-.faces{display:flex}
-.face{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:9px;font-weight:700;color:#fff;background:hsl(var(--h) 42% 42%);border:2px solid var(--surface);margin-left:-7px}
-.face:first-child{margin-left:0}
 .hours{margin-top:14px;padding-top:14px;border-top:1px dashed var(--line)}
-.voters{margin-top:12px;border-top:1px solid var(--line)}
-.voters summary{display:flex;align-items:center;gap:8px;min-height:var(--tap);cursor:pointer;font-weight:600;color:var(--muted);list-style:none}
-.voters summary::-webkit-details-marker{display:none}
-.voters summary::before{content:"▸";display:inline-block;transition:transform .2s}
-.voters[open] summary::before{transform:rotate(90deg)}
-.voters p{margin:4px 0 0}
+/* Voto confirmado: lo elegido a la vista, con el botón para cambiarlo */
+.myvote{display:flex;align-items:center;gap:12px;padding:10px 10px 10px 12px;border-radius:12px;border:1px solid var(--win);background:color-mix(in srgb,var(--win) 8%,var(--surface))}
+.myvote .mv{flex:1;min-width:0;display:grid;gap:1px}
+.myvote .k{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
+.myvote .btn{flex:none}
+
+/* Cómo va: la encuesta en vivo. Lo que entra mientras se mira se enciende un momento */
+.live{display:inline-flex;align-items:center;gap:6px;flex:none;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--win)}
+.live::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
+.live.off{color:var(--muted)}
+.tally{display:grid;gap:12px;margin-top:12px}
+.trow{display:grid;gap:6px;padding-top:12px;border-top:1px solid var(--line)}
+.trow:first-child{padding-top:0;border-top:0}
+/* Hora + etiqueta ("Más votado"): si no entran juntas en el celu, la etiqueta baja alineada */
+.slot-l{display:flex;flex-wrap:wrap;align-items:center;gap:2px 8px}
+.trow.pick .ol{color:var(--a)}
+.names{display:flex;flex-wrap:wrap;gap:4px}
+.names>span{padding:2px 9px;border:1px solid transparent;border-radius:99px;background:var(--bg);font-size:13px;font-weight:600}
+.names>.me{background:var(--a-soft);color:var(--a)}
+.names.off>span{background:none;border:1px dashed var(--line);color:var(--muted);font-weight:500}
+.names>.new{box-shadow:inset 0 0 0 1.5px var(--hot)}
+@keyframes live-pulse{from{box-shadow:0 0 0 0 color-mix(in srgb,var(--win) 60%,transparent)}to{box-shadow:0 0 0 7px transparent}}
+@keyframes just-in{from{background:color-mix(in srgb,var(--hot) 45%,var(--surface));transform:scale(1.15)}}
+@media (prefers-reduced-motion:no-preference){
+  .live:not(.off)::before{animation:live-pulse 1.6s ease-out infinite}
+  .names>.new{animation:just-in .9s ease-out}
+  .obar i{transition:width .4s ease}
+}
 
 /* Organizador */
 .slot-pick{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
