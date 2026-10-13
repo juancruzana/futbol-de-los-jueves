@@ -7,7 +7,7 @@ import {
 import type { Format, Lineup, Match } from "@/lib/types";
 import { track } from "@/lib/analytics";
 import type { Ctx } from "./ctx";
-import { NewMatchButton } from "./Hero";
+import Convocatoria, { Summary } from "./Convocatoria";
 import { useFresh } from "./fresh";
 
 /* ---------- Piezas chicas ---------- */
@@ -197,22 +197,45 @@ function Poll({ ctx, m }: { ctx: Ctx; m: Match }) {
 }
 
 /* ---------- Panel del organizador ---------- */
+const FORMAT_LIST = Object.keys(FORMATS) as Format[];
+
 function Organizer({ ctx, m }: { ctx: Ctx; m: Match }) {
-  const { data, supabase, run } = ctx;
+  const { data, supabase, run, pname } = ctx;
   const p = pollSummary(m, data);
   const need = FORMATS[m.format] ?? 22;
-  const [newSlot, setNewSlot] = useState("19:00");
-  const [adding, setAdding] = useState(false);
   const maxH = Math.max(0, ...p.slots.map((s) => p.bySlot[s].length));
-  const upd = (patch: Partial<Match>, ok?: string) =>
-    run(() => supabase.from("matches").update(patch).eq("id", m.id), ok);
+  const [editing, setEditing] = useState(false);
+  // Antes de cerrar: el horario elegido y lo que todavía se puede ajustar. Se guarda todo junto al confirmar.
+  const [pick, setPick] = useState<string | null>(null);
+  const [date, setDate] = useState(m.date);
+  const [format, setFormat] = useState<Format>(m.format);
+  const [busy, setBusy] = useState(false);
 
-  async function pickTime(s: string) {
-    await run(async () => {
+  if (editing) return <Convocatoria ctx={ctx} m={m} onClose={() => setEditing(false)} />;
+
+  const going = pick ? p.bySlot[pick] ?? [] : [];
+  const needAt = FORMATS[format] ?? 22;
+  // El formato más grande que se llena con los que pueden a esa hora.
+  const fit = FORMAT_LIST.filter((f) => FORMATS[f] <= going.length).pop();
+
+  function choose(s: string) {
+    setPick(s === pick ? null : s);
+    setDate(m.date);
+    setFormat(m.format);
+  }
+  async function close() {
+    if (!pick) return;
+    setBusy(true);
+    const ok = await run(async () => {
       const del = await supabase.from("lineups").delete().eq("match_id", m.id);
       if (del.error) return del;
-      return supabase.from("matches").update({ time: s }).eq("id", m.id);
-    }, `Horario confirmado: ${hs(s)}`);
+      return supabase.from("matches").update({ time: pick, date, format }).eq("id", m.id);
+    }, `Encuesta cerrada · ${hs(pick)}`);
+    setBusy(false);
+    if (ok) {
+      track("poll_closed", { edited: date !== m.date || format !== m.format });
+      setPick(null);
+    }
   }
   async function reopen() {
     await run(async () => {
@@ -222,96 +245,76 @@ function Organizer({ ctx, m }: { ctx: Ctx; m: Match }) {
     }, "Encuesta reabierta");
   }
 
-  const dupSlot = p.slots.includes(newSlot);
-  function addSlot() {
-    if (!newSlot || dupSlot) return;
-    upd({ slots: sortSlots([...p.slots, newSlot]) }, "Horario agregado");
-    setAdding(false);
-  }
-  function startAdding() {
-    // Sugiere una hora después del último horario
-    const h = Number(p.slots[p.slots.length - 1]?.slice(0, 2) ?? 18) + 1;
-    setNewSlot(`${String(h % 24).padStart(2, "0")}:00`);
-    setAdding(true);
-  }
-
   return (
     <section className="card">
-      <h2>Organizador</h2>
-      <div className="fields">
-        <div className="field">
-          <label htmlFor="mdate">Día</label>
-          <input type="date" id="mdate" value={m.date} onChange={(e) => e.target.value && upd({ date: e.target.value })} />
-        </div>
-        <div className="field">
-          <label htmlFor="mformat">Formato</label>
-          <select id="mformat" value={m.format} onChange={(e) => upd({ format: e.target.value as Format })}>
-            {Object.keys(FORMATS).map((f) => <option key={f} value={f}>{f} · {FORMATS[f as Format]} jug.</option>)}
-          </select>
-        </div>
+      <div className="card-head">
+        <h2>Organizador</h2>
+        <button className="btn ghost" onClick={() => { setPick(null); setEditing(true); }}>Editar encuesta</button>
       </div>
+      <Summary d={{ date: m.date, slots: p.slots, format: m.format }} />
 
       {m.time ? (
         <>
-          <h3 className="sub">Horario</h3>
+          <h3 className="sub">Encuesta cerrada</h3>
           <div className="combo" style={{ alignItems: "center" }}>
-            <span>Confirmado: <b>{hs(m.time)}</b></span>
-            <button className="btn ghost" onClick={reopen}>Cambiar</button>
+            <span>Juegan a las <b>{hs(m.time)}</b></span>
+            <button className="btn ghost" onClick={reopen}>Reabrir</button>
           </div>
         </>
       ) : (
         <>
-          <h3 className="sub">Horarios de la encuesta</h3>
-          <div className="chips" style={{ marginBottom: 10 }}>
-            {p.slots.map((s) => (
-              <span key={s} className="chip slot">
-                {hs(s)}
-                <button
-                  className="x"
-                  aria-label={`Quitar ${hs(s)}`}
-                  onClick={() =>
-                    p.slots.length > 1
-                      ? upd({ slots: p.slots.filter((x) => x !== s) })
-                      : ctx.toast("Tiene que quedar al menos un horario")
-                  }
-                >×</button>
-              </span>
-            ))}
-            {adding ? (
-              <span className="slot-add">
-                <input
-                  type="time" step={1800} value={newSlot} autoFocus
-                  aria-label="Nuevo horario"
-                  aria-invalid={dupSlot} aria-describedby={dupSlot ? "newslot-err" : undefined}
-                  onChange={(e) => setNewSlot(e.target.value)}
-                />
-                <button className="btn" disabled={!newSlot || dupSlot} onClick={addSlot}>Agregar</button>
-                <button className="x" aria-label="Cancelar" onClick={() => setAdding(false)}>×</button>
-              </span>
-            ) : (
-              <button className="chip slot add" onClick={startAdding}>+ Agregar</button>
-            )}
-          </div>
-          {adding && dupSlot && <p className="err" id="newslot-err" style={{ marginBottom: 10 }}>Ese horario ya está en la encuesta.</p>}
-
-          <h3 className="sub">Confirmar horario</h3>
+          <h3 className="sub">Cerrar encuesta</h3>
           <p className="hint" style={{ marginBottom: 8 }}>
-            Elegilo cuando haya suficientes votos. Juegan los que marcaron esa hora.
+            Elegí el horario cuando haya suficientes votos. Juegan los que marcaron esa hora.
           </p>
           <div className="slot-pick">
             {p.slots.map((s) => {
               const n = p.bySlot[s].length;
+              const on = pick ? pick === s : !!n && n === maxH;
               return (
-                <button key={s} className={`btn ${n && n === maxH ? "" : "ghost"}`} disabled={!n} onClick={() => pickTime(s)}>
+                <button key={s} className={`btn ${on ? "" : "ghost"}`} aria-pressed={pick === s} disabled={!n} onClick={() => choose(s)}>
                   {hs(s)} · {n}{n >= need ? " ✓" : ""}
                 </button>
               );
             })}
           </div>
-          {p.best && p.bySlot[p.best].length < need && (
-            <p className="small" style={{ margin: "10px 0 0" }}>
-              Al mejor horario le faltan {need - p.bySlot[p.best].length} para {m.format}.
-            </p>
+          {pick ? (
+            <div className="closebox">
+              <p style={{ margin: 0 }}>
+                <b>Cerrar a las {hs(pick)}</b> · pueden {going.length}. Último momento para ajustar:
+              </p>
+              <div className="fields">
+                <div className="field">
+                  <label htmlFor="cl-date">Día</label>
+                  <input type="date" id="cl-date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} />
+                </div>
+                <div className="field">
+                  <label htmlFor="cl-format">Formato</label>
+                  <select id="cl-format" value={format} onChange={(e) => setFormat(e.target.value as Format)}>
+                    {FORMAT_LIST.map((f) => <option key={f} value={f}>{f} · {FORMATS[f]} jug.</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="row" style={{ justifyContent: "space-between" }}>
+                <span className="small">
+                  {going.length >= needAt ? `Alcanza para ${format} ✓` : `Faltan ${needAt - going.length} para ${format}.`}
+                </span>
+                {going.length < needAt && fit && (
+                  <button className="btn ghost" onClick={() => setFormat(fit)}>Pasar a {fit}</button>
+                )}
+              </div>
+              <p className="small muted" style={{ margin: 0 }}>Juegan: {going.map(pname).join(", ")}</p>
+              <div className="confirm">
+                <button className="btn ghost" onClick={() => setPick(null)}>Volver</button>
+                <button className="btn" disabled={busy} onClick={close}>Cerrar encuesta</button>
+              </div>
+            </div>
+          ) : (
+            p.best && p.bySlot[p.best].length < need && (
+              <p className="small" style={{ margin: "10px 0 0" }}>
+                Al mejor horario le faltan {need - p.bySlot[p.best].length} para {m.format}.
+              </p>
+            )
           )}
         </>
       )}
@@ -551,15 +554,11 @@ export default function Partido({ ctx }: { ctx: Ctx }) {
     );
   }
   if (!m) {
+    if (isAdmin) return <Convocatoria ctx={ctx} />;
     return (
       <div className="card empty">
         <h2>No hay encuesta abierta</h2>
-        <p className="muted">
-          {isAdmin
-            ? "Abrí una para el próximo partido y que cada uno vote si va y a qué hora."
-            : "Cuando el organizador abra la encuesta del próximo partido, la vas a ver acá."}
-        </p>
-        {isAdmin && <NewMatchButton ctx={ctx} />}
+        <p className="muted">Cuando el organizador abra la encuesta del próximo partido, la vas a ver acá.</p>
       </div>
     );
   }

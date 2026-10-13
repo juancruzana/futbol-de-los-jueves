@@ -7,7 +7,9 @@ import posthog from "posthog-js";
 export type AnalyticsEvent =
   | "app_opened"          // abrió la app, o volvió después de un rato
   | "tab_viewed"          // { tab }: tabla (ranking), partido, historial, plantel, perfil
-  | "match_created"       // abrió una encuesta (convocatoria)
+  | "match_created"       // { format, slots }: abrió una encuesta (convocatoria) con el asistente
+  | "match_edited"        // { date, slots, format }: qué cambió de la encuesta abierta
+  | "poll_closed"         // { edited }: cerró la encuesta confirmando el horario (edited = ajustó día o formato al cerrar)
   | "availability_voted"  // { going, for_other }: votó si juega (going null = borró el voto)
   | "teams_generated"     // { players }: armó los equipos
   | "result_saved"        // cargó el resultado

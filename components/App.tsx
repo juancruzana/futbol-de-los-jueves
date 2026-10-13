@@ -6,7 +6,7 @@ import type { Data, Group } from "@/lib/types";
 import { openMatch, pendingMvpVote } from "@/lib/stats";
 import { identify, resetAnalytics, setContext, track } from "@/lib/analytics";
 import type { Ctx, Tab } from "./ctx";
-import Hero, { NewMatchButton } from "./Hero";
+import Hero from "./Hero";
 import Tabla from "./Tabla";
 import Partido from "./Partido";
 import Historial from "./Historial";
@@ -311,7 +311,8 @@ export default function App({
     } else if (needsMvpVote && tab !== "historial") {
       fab = <button className="btn fab" onClick={() => setTab("historial")}>Votá la figura</button>;
     } else if (isAdmin && !open && data.players.length > 0) {
-      fab = <NewMatchButton ctx={ctx} className="fab" />;
+      // La encuesta se arma por pasos en "Partido".
+      fab = <button className="btn fab" id="new-match" onClick={() => setTab("partido")}>+ Abrir encuesta</button>;
     }
   }
 

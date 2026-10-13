@@ -1,8 +1,6 @@
 "use client";
 
-import { useState } from "react";
 import { FORMATS, dayLabel, fmtDate, hs, openMatch, playedMatches, pollSummary } from "@/lib/stats";
-import { track } from "@/lib/analytics";
 import type { Ctx } from "./ctx";
 
 export default function Hero({ ctx }: { ctx: Ctx }) {
@@ -81,29 +79,5 @@ export default function Hero({ ctx }: { ctx: Ctx }) {
         </div>
       </div>
     </header>
-  );
-}
-
-export function NewMatchButton({ ctx, className = "" }: { ctx: Ctx; className?: string }) {
-  const { supabase, run, data, setTab, group } = ctx;
-  const [busy, setBusy] = useState(false);
-  async function create() {
-    const P = playedMatches(data.matches);
-    const last = P[P.length - 1];
-    setBusy(true);
-    const ok = await run(
-      () => supabase.from("matches").insert({ group_id: group.id, format: last?.format ?? "F11", date: new Date().toLocaleDateString("en-CA") }),
-      "Encuesta abierta"
-    );
-    setBusy(false);
-    if (ok) {
-      track("match_created");
-      setTab("partido");
-    }
-  }
-  return (
-    <button className={`btn ${className}`} id="new-match" disabled={busy} onClick={create}>
-      + Abrir encuesta
-    </button>
   );
 }
