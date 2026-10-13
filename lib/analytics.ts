@@ -11,6 +11,7 @@ export type AnalyticsEvent =
   | "match_edited"        // { date, slots, format }: qué cambió de la encuesta abierta
   | "poll_closed"         // { edited }: cerró la encuesta confirmando el horario (edited = ajustó día o formato al cerrar)
   | "availability_voted"  // { going, for_other, changed }: confirmó su voto (going null = lo borró; changed = ya tenía uno)
+  | "poll_shared"         // { method }: share o whatsapp: compartió el link de la encuesta
   | "teams_generated"     // { players }: armó los equipos
   | "result_saved"        // cargó el resultado
   | "mvp_voted"           // { removed }: votó la figura

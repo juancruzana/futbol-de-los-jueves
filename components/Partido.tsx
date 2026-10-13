@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  FORMATS, balanceTeams, computeStats, dayLabel, hs, openMatch, pollSummary, sortSlots,
+  FORMATS, balanceTeams, computeStats, dayLabel, fmtDate, hs, openMatch, pollSummary, sortSlots,
 } from "@/lib/stats";
 import type { Format, Lineup, Match } from "@/lib/types";
 import { track } from "@/lib/analytics";
@@ -92,12 +92,32 @@ function Poll({ ctx, m }: { ctx: Ctx; m: Match }) {
     setDraft(undefined);
   }
 
+  // El link abre la app en esta encuesta (app/convocatoria/[id]). Sin la hoja de compartir del sistema, va por WhatsApp.
+  async function share() {
+    const link = `${window.location.origin}/convocatoria/${m.id}`;
+    const text = m.time
+      ? `¿Jugás el ${fmtDate(m.date)} a las ${hs(m.time)}? ${m.format}. Votá acá: ${link}`
+      : `¿Jugás el ${fmtDate(m.date)}? ${m.format} · ${slotsLabel(p.slots)}. Votá acá: ${link}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "Encuesta del partido", text });
+        track("poll_shared", { method: "share" });
+      } catch {}
+      return;
+    }
+    track("poll_shared", { method: "whatsapp" });
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+  }
+
   const disabled = !voter || busy;
   const fresh = useFresh(`poll:${m.id}`);
 
   return (
     <section className={`card waq ${fresh ? "fresh" : ""}`}>
-      <h2 style={{ marginBottom: 2 }}>{dayLabel(m.date)}</h2>
+      <div className="card-head">
+        <h2>{dayLabel(m.date)}</h2>
+        <button className="btn ghost" id="share-poll" onClick={share}>Compartir</button>
+      </div>
       <p className="small muted" style={{ margin: "0 0 12px" }}>
         ¿Jugás? · {m.format}, hacen falta {need}
         {m.time && <> · Horario confirmado: <b style={{ color: "var(--ink)" }}>{hs(m.time)}</b></>}
@@ -634,8 +654,8 @@ export default function Partido({ ctx }: { ctx: Ctx }) {
   }
 
   const hasTeams = data.lineups.some((l) => l.match_id === m.id);
-  // "Cómo va" aparece recién después de votar. Un organizador sin jugador no tiene cómo votar (lo ve siempre)
-  const voted = !meId || data.availability.some((a) => a.match_id === m.id && a.player_id === meId);
+  // "Cómo va" aparece recién después de votar; el organizador lo ve siempre.
+  const watching = isAdmin || data.availability.some((a) => a.match_id === m.id && a.player_id === meId);
 
   // Partido ya jugado que se reabrió desde Historial: solo equipos y resultado.
   if (m.played_at) {
@@ -650,7 +670,7 @@ export default function Partido({ ctx }: { ctx: Ctx }) {
   return (
     <>
       <Poll ctx={ctx} m={m} key={`poll-${m.id}`} />
-      {voted && <Board ctx={ctx} m={m} key={`board-${m.id}`} />}
+      {watching && <Board ctx={ctx} m={m} key={`board-${m.id}`} />}
       {isAdmin && <Organizer ctx={ctx} m={m} />}
       {m.time && <Teams ctx={ctx} m={m} />}
       {m.time && hasTeams && isAdmin && <ResultForm ctx={ctx} m={m} key={`res-${m.id}`} />}

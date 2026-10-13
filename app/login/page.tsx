@@ -48,11 +48,12 @@ function LoginInner() {
         <header className="pitch">
           <div className="eyebrow">{invited ? "Te invitaron a un grupo" : "El fútbol de tu grupo"}</div>
           <h1>FutbolApp</h1>
-          <p style={{ margin: "10px 0 0", opacity: 0.9 }}>
-            {invited
-              ? "Entrá con Google y elegí tu nombre para sumarte."
-              : "Votá si vas, elegí tu horario y mirá cómo viene la tabla."}
+          <p style={{ margin: "10px 0 0", fontSize: 17, fontWeight: 600, lineHeight: 1.35 }}>
+            Quién juega, quién falta y cómo quedó. Todo en un lugar.
           </p>
+          {invited && (
+            <p style={{ margin: "6px 0 0", opacity: 0.9 }}>Entrá con Google y elegí tu nombre para sumarte.</p>
+          )}
         </header>
 
         <section className="card" style={{ display: "grid", gap: 14 }}>
