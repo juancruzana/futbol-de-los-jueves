@@ -631,7 +631,7 @@ function ResultForm({ ctx, m }: { ctx: Ctx; m: Match }) {
 
 /* ---------- Página ---------- */
 export default function Partido({ ctx }: { ctx: Ctx }) {
-  const { data, isAdmin, meId, supabase, run } = ctx;
+  const { data, isAdmin, supabase, run } = ctx;
   const m = openMatch(data.matches);
   const [confirmDel, setConfirmDel] = useState(false);
 
@@ -654,8 +654,6 @@ export default function Partido({ ctx }: { ctx: Ctx }) {
   }
 
   const hasTeams = data.lineups.some((l) => l.match_id === m.id);
-  // "Cómo va" aparece recién después de votar; el organizador lo ve siempre.
-  const watching = isAdmin || data.availability.some((a) => a.match_id === m.id && a.player_id === meId);
 
   // Partido ya jugado que se reabrió desde Historial: solo equipos y resultado.
   if (m.played_at) {
@@ -670,7 +668,7 @@ export default function Partido({ ctx }: { ctx: Ctx }) {
   return (
     <>
       <Poll ctx={ctx} m={m} key={`poll-${m.id}`} />
-      {watching && <Board ctx={ctx} m={m} key={`board-${m.id}`} />}
+      <Board ctx={ctx} m={m} key={`board-${m.id}`} />
       {isAdmin && <Organizer ctx={ctx} m={m} />}
       {m.time && <Teams ctx={ctx} m={m} />}
       {m.time && hasTeams && isAdmin && <ResultForm ctx={ctx} m={m} key={`res-${m.id}`} />}
